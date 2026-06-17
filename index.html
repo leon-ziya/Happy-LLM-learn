@@ -187,15 +187,335 @@
   /* 欢迎页（无章节选中时） */
   .welcome {
     flex: 1;
+    min-height: 0;          /* flex 子项内部滚动必需 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    scroll-behavior: smooth;
+    background: var(--bg);
+  }
+  .welcome::-webkit-scrollbar { width: 6px; }
+  .welcome::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .welcome::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* 神经网络 Canvas 背景 */
+  #neuralBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* 内容层 */
+  .welcome-inner {
+    position: relative;
+    z-index: 1;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 56px 32px 80px;
+  }
+
+  /* Hero 区 */
+  .hero {
+    text-align: center;
+    padding: 40px 0 48px;
+  }
+  .hero .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(34,214,138,0.3);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 28px;
+    animation: badgePulse 3s ease-in-out infinite;
+  }
+  .hero .hero-badge i { font-size: 11px; }
+  @keyframes badgePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,214,138,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(34,214,138,0); }
+  }
+  .hero h1 {
+    font-size: clamp(34px, 6vw, 58px);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 18px;
+    background: linear-gradient(120deg, #fff 0%, var(--accent) 60%, #5eead4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .subtitle {
+    font-size: clamp(15px, 2vw, 18px);
+    color: var(--muted);
+    max-width: 620px;
+    margin: 0 auto 32px;
+    line-height: 1.7;
+  }
+  .hero .subtitle b { color: var(--fg); font-weight: 500; }
+  .hero .typed-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .hero-stat {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    padding: 14px 28px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    min-width: 120px;
+    transition: border-color 0.25s, transform 0.25s;
+  }
+  .hero-stat:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+  }
+  .hero-stat .num {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .hero-stat .label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 36px;
+    padding: 14px 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #0f1117;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 6px 24px rgba(34,214,138,0.3);
+  }
+  .hero-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(34,214,138,0.45);
+  }
+
+  /* 区块通用 */
+  .section { margin-top: 64px; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .section-head .sec-icon {
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 16px;
+  }
+  .section-head h2 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  .section-head .sec-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* 功能卡片网格 */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 16px;
+  }
+  .feature-card {
+    padding: 24px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    transition: border-color 0.25s, transform 0.25s, background 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s;
+  }
+  .feature-card:hover {
+    border-color: rgba(34,214,138,0.4);
+    transform: translateY(-4px);
+    background: rgba(34,214,138,0.04);
+  }
+  .feature-card:hover::before { transform: scaleX(1); }
+  .feature-card .fc-icon {
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .feature-card p { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+  /* 章节预览 */
+  .chapter-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cp-item {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 24px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .cp-item:hover {
+    border-color: var(--accent);
+    transform: translateX(6px);
+    background: rgba(34,214,138,0.04);
+  }
+  .cp-item .cp-num {
+    font-size: 32px;
+    font-weight: 900;
+    color: rgba(34,214,138,0.25);
+    min-width: 44px;
+    transition: color 0.25s;
+  }
+  .cp-item:hover .cp-num { color: var(--accent); }
+  .cp-item .cp-body { flex: 1; }
+  .cp-item .cp-body h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .cp-item .cp-body p { font-size: 13px; color: var(--muted); }
+  .cp-item .cp-go {
+    color: var(--muted);
+    transition: all 0.25s;
+  }
+  .cp-item:hover .cp-go { color: var(--accent); transform: translateX(4px); }
+
+  /* 开源共建 */
+  .opensource {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .os-card {
+    padding: 28px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(34,214,138,0.06), rgba(255,255,255,0.01));
+  }
+  .os-card h3 { font-size: 18px; font-weight: 800; margin-bottom: 12px; }
+  .os-card p { font-size: 13px; color: var(--muted); line-height: 1.8; margin-bottom: 16px; }
+  .os-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .os-tag {
+    padding: 5px 12px;
+    border-radius: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    font-size: 12px;
     color: var(--muted);
   }
-  .welcome i { font-size: 48px; opacity: 0.3; }
-  .welcome p { font-size: 15px; }
+  .os-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .os-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--fg);
+    font-size: 14px;
+    transition: all 0.25s;
+  }
+  .os-link:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+  }
+  .os-link i.os-ic { color: var(--accent); font-size: 18px; width: 22px; text-align: center; }
+  .os-link .os-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .os-link .os-arrow { margin-left: auto; color: var(--muted); transition: transform 0.25s; }
+  .os-link:hover .os-arrow { transform: translateX(4px); color: var(--accent); }
+
+  /* 页脚 */
+  .welcome-footer {
+    text-align: center;
+    margin-top: 72px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .welcome-footer .wf-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg);
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .welcome-footer .wf-logo i { color: var(--accent); }
+
+  /* 响应式微调 */
+  @media (max-width: 640px) {
+    .welcome-inner { padding: 32px 18px 60px; }
+    .opensource { grid-template-columns: 1fr; }
+    .hero h1 { letter-spacing: -0.8px; }
+  }
 
   /* 底部导航 */
   .bottom-nav {
@@ -293,8 +613,186 @@
   <!-- 内容区 -->
   <div class="content-area">
     <div class="welcome" id="welcomeScreen">
-      <i class="fas fa-book-reader"></i>
-      <p>从左侧目录选择章节开始阅读</p>
+      <!-- 神经网络动画背景 -->
+      <canvas id="neuralBg"></canvas>
+
+      <div class="welcome-inner">
+        <!-- ===== Hero 区 ===== -->
+        <section class="hero">
+          <span class="hero-badge"><i class="fas fa-bolt"></i> AI 驱动 · 可视化学习</span>
+          <h1>Happy-LLM<br>看得见的大模型</h1>
+          <p class="subtitle">
+            借助 AI 能力，用 <b>HTML</b> 技术对《Happy-LLM》进行<b>结构化</b> · <b>可视化</b> · <b>沉浸式</b>呈现。<br>
+            把抽象的模型架构与历史脉络，像电影一样在你眼前徐徐展开<span class="typed-cursor"></span>
+          </p>
+          <div class="hero-stats">
+            <div class="hero-stat"><span class="num">2</span><span class="label">已发布章节</span></div>
+            <div class="hero-stat"><span class="num">0</span><span class="label">构建依赖</span></div>
+            <div class="hero-stat"><span class="num">100%</span><span class="label">纯前端</span></div>
+            <div class="hero-stat"><span class="num">∞</span><span class="label">离线可读</span></div>
+          </div>
+          <button class="hero-cta" onclick="loadChapter(0)">
+            <i class="fas fa-rocket"></i> 立即开始学习
+          </button>
+        </section>
+
+        <!-- ===== 项目介绍 ===== -->
+        <section class="section">
+          <div class="section-head">
+            <div class="sec-icon"><i class="fas fa-lightbulb"></i></div>
+            <div>
+              <h2>这是什么？</h2>
+              <div class="sec-sub">PROJECT · 一本会动的 LLM 科普书</div>
+            </div>
+          </div>
+          <div class="os-card">
+            <h3>📖 让大语言模型「看得见、摸得着、学得会」</h3>
+            <p>
+              传统教材是「静态」的：密密麻麻的文字、平铺的流程图、难以感知的维度变化。Happy-LLM-Learn 是一次「视觉化学习」实验——我们借助 AI 的结构化能力，将《Happy-LLM》中晦涩的概念拆解为<strong style="color:var(--fg)">逐帧动画、时间轴、组件拆解图</strong>，封装进一个个独立的 HTML 文件中。
+            </p>
+            <p style="margin-bottom:0">
+              简单说：<strong style="color:var(--accent)">这是一本「会动」的 LLM 科普书。</strong> 点一下「下一步」，复杂流程就会一步步「演」给你看，而不是一次性堆给你。
+            </p>
+          </div>
+        </section>
+
+        <!-- ===== 功能特色 ===== -->
+        <section class="section">
+          <div class="section-head">
+            <div class="sec-icon"><i class="fas fa-star"></i></div>
+            <div>
+              <h2>核心特色</h2>
+              <div class="sec-sub">FEATURES · 六大亮点</div>
+            </div>
+          </div>
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-film"></i></div>
+              <h3>逐步可视化</h3>
+              <p>每个知识点拆成多个步骤，点击「下一步」即可看到概念「动起来」，信息不一次性倾倒。</p>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-stream"></i></div>
+              <h3>时间轴叙事</h3>
+              <p>用纵向时间轴讲述 NLP 从 1940s 到深度学习时代的发展脉络，徐徐展开。</p>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-cubes"></i></div>
+              <h3>架构解剖</h3>
+              <p>Transformer 各组件分层透视，数据流向一目了然，把大模型拆成零件逐个点亮。</p>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-moon"></i></div>
+              <h3>沉浸式暗色主题</h3>
+              <p>护眼的深色界面搭配标志性薄荷绿高亮，长时间阅读不疲劳。</p>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-bolt"></i></div>
+              <h3>零构建零依赖</h3>
+              <p>无 Node、无 Webpack、无 npm install——纯静态文件，双击 HTML 即可运行。</p>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon"><i class="fas fa-mobile-alt"></i></div>
+              <h3>响应式适配</h3>
+              <p>桌面 / 平板 / 手机三端自适应，移动端可折叠侧栏，随时随地学习。</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 章节预览 ===== -->
+        <section class="section">
+          <div class="section-head">
+            <div class="sec-icon"><i class="fas fa-book-open"></i></div>
+            <div>
+              <h2>章节总览</h2>
+              <div class="sec-sub">CHAPTERS · 点击直接进入</div>
+            </div>
+          </div>
+          <div class="chapter-preview">
+            <div class="cp-item" onclick="loadChapter(0)">
+              <span class="cp-num">01</span>
+              <div class="cp-body">
+                <h3>NLP 基础概念</h3>
+                <p>NLP 发展时间轴 · 词表示演进（VSM/N-gram/Word2Vec/ELMo）· NLP 任务全景</p>
+              </div>
+              <i class="fas fa-arrow-right cp-go"></i>
+            </div>
+            <div class="cp-item" onclick="loadChapter(1)">
+              <span class="cp-num">02</span>
+              <div class="cp-body">
+                <h3>Transformer 架构</h3>
+                <p>端到端数据流逐步演示 · 组件拆解（Encoder/Decoder/Attention）· 完整流程总结</p>
+              </div>
+              <i class="fas fa-arrow-right cp-go"></i>
+            </div>
+            <div class="cp-item" style="opacity:0.5;cursor:default" onclick="event.preventDefault()">
+              <span class="cp-num">03</span>
+              <div class="cp-body">
+                <h3>敬请期待 <span style="font-size:11px;color:var(--accent)">🚧 规划中</span></h3>
+                <p>更多章节正在路上，欢迎在 GitHub 上许愿你最想看的主题</p>
+              </div>
+              <i class="fas fa-hourglass-half cp-go"></i>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 开源共建 ===== -->
+        <section class="section">
+          <div class="section-head">
+            <div class="sec-icon"><i class="fas fa-code-branch"></i></div>
+            <div>
+              <h2>开源共建</h2>
+              <div class="sec-sub">OPEN SOURCE · 一起让这本书更酷</div>
+            </div>
+          </div>
+          <div class="opensource">
+            <div class="os-card">
+              <h3>🤝 欢迎你的参与</h3>
+              <p>这是一个开放的视觉化学习项目。我们用一套标准化的 Prompt 模板 + AI 协作生成每一章，保证风格统一、体验一致。欢迎任何形式的贡献：</p>
+              <div class="os-tags">
+                <span class="os-tag">🐛 报告问题</span>
+                <span class="os-tag">💡 许愿章节</span>
+                <span class="os-tag">✍️ 改进内容</span>
+                <span class="os-tag">🎨 设计打磨</span>
+                <span class="os-tag">📚 新增章节</span>
+              </div>
+            </div>
+            <div class="os-links">
+              <a class="os-link" href="https://github.com/leon-ziya/Happy-LLM-learn" target="_blank" rel="noopener">
+                <i class="fab fa-github os-ic"></i>
+                <div>
+                  <div>GitHub 仓库</div>
+                  <div class="os-meta">Star ⭐ / Watch / Fork</div>
+                </div>
+                <i class="fas fa-arrow-right os-arrow"></i>
+              </a>
+              <a class="os-link" href="https://github.com/leon-ziya/Happy-LLM-learn/issues" target="_blank" rel="noopener">
+                <i class="fas fa-bug os-ic"></i>
+                <div>
+                  <div>提交 Issue</div>
+                  <div class="os-meta">反馈建议 · 许愿章节</div>
+                </div>
+                <i class="fas fa-arrow-right os-arrow"></i>
+              </a>
+              <a class="os-link" href="https://github.com/leon-ziya/Happy-LLM-learn/blob/main/dcos/%E5%8F%AF%E8%A7%86%E5%8C%96Prompt%E6%A8%A1%E6%9D%BF.md" target="_blank" rel="noopener">
+                <i class="fas fa-magic os-ic"></i>
+                <div>
+                  <div>可视化 Prompt 模板</div>
+                  <div class="os-meta">了解我们如何「指挥」AI</div>
+                </div>
+                <i class="fas fa-arrow-right os-arrow"></i>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 页脚 ===== -->
+        <div class="welcome-footer">
+          <div class="wf-logo"><i class="fas fa-brain"></i> Happy-LLM-Learn</div>
+          <div>Built with ❤️ · Powered by AI · Crafted for Learners</div>
+          <div style="margin-top:6px;opacity:0.6">MIT License · 原始教材版权归原作者所有，本项目仅用于学习交流</div>
+        </div>
+      </div>
     </div>
     <iframe id="contentFrame" style="display:none"></iframe>
     <div class="bottom-nav">
@@ -310,6 +808,133 @@
 </div>
 
 <script>
+  // ============================================================
+  //  神经网络背景动画 —— AI 感的动态粒子网络
+  // ============================================================
+  (function initNeuralBg() {
+    const canvas = document.getElementById('neuralBg');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const ACCENT = '34,214,138'; // --accent rgb
+    let nodes = [];
+    let w = 0, h = 0, rafId = null;
+
+    function resize() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      // 用设备像素比保证清晰
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = Math.max(1, rect.width);
+      h = Math.max(1, rect.height);
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // 节点数量随面积自适应（限制上限保性能）
+      const count = Math.min(70, Math.floor((w * h) / 16000));
+      nodes = [];
+      for (let i = 0; i < count; i++) {
+        nodes.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          r: Math.random() * 1.6 + 0.6,
+          pulse: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    const mouse = { x: -9999, y: -9999 };
+    canvas.parentElement.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+    });
+    canvas.parentElement.addEventListener('mouseleave', () => {
+      mouse.x = -9999; mouse.y = -9999;
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      const maxDist = 130;
+
+      // 更新位置
+      for (const n of nodes) {
+        n.x += n.vx; n.y += n.vy; n.pulse += 0.02;
+        if (n.x < 0 || n.x > w) n.vx *= -1;
+        if (n.y < 0 || n.y > h) n.vy *= -1;
+
+        // 鼠标轻微吸引
+        const dxm = n.x - mouse.x, dym = n.y - mouse.y;
+        const dm = Math.hypot(dxm, dym);
+        if (dm < 160) {
+          n.x += dxm / dm * 0.4;
+          n.y += dym / dm * 0.4;
+        }
+      }
+
+      // 连线
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const d = Math.hypot(dx, dy);
+          if (d < maxDist) {
+            const a = (1 - d / maxDist) * 0.22;
+            ctx.strokeStyle = `rgba(${ACCENT},${a})`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 节点（带脉冲发光）
+      for (const n of nodes) {
+        const glow = 0.5 + Math.sin(n.pulse) * 0.5;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, Math.max(0.5, n.r), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${ACCENT},${0.4 + glow * 0.5})`;
+        ctx.fill();
+        // 光晕
+        const haloR = Math.max(1, n.r * 4);
+        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+        grad.addColorStop(0, `rgba(${ACCENT},${0.12 * glow})`);
+        grad.addColorStop(1, `rgba(${ACCENT},0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, haloR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      rafId = requestAnimationFrame(draw);
+    }
+
+    // 可见时才绘制，切到章节页时停止动画省 CPU
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          if (!rafId) { resize(); draw(); }
+        } else {
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        }
+      });
+    });
+    io.observe(canvas);
+
+    let rt;
+    window.addEventListener('resize', () => {
+      clearTimeout(rt);
+      rt = setTimeout(resize, 150);
+    });
+
+    resize();
+    draw();
+  })();
+
   // ============================================================
   //  章节配置 —— 在这里添加/修改你的章节
   //  path 相对于 index.html 所在目录
