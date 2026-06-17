@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>敬请期待 · AI 的无限未来</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;700;900&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b14;--fg:#e8ecf4;--muted:#6b7a94;
+  --primary:#a78bfa;--secondary:#06b6d4;--tertiary:#f0abfc;
+  --card:#0f1724;--border:#1a2540;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--fg);overflow-x:hidden;min-height:100vh}
+
+/* 星空 / 神经网络背景 */
+#bgCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.app{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:20px 24px 60px}
+
+/* 顶部徽章 */
+header{text-align:center;padding:32px 0 8px}
+.ch-badge{display:inline-block;padding:4px 14px;border-radius:999px;font-size:12px;font-weight:700;margin-bottom:14px;background:rgba(167,139,250,.12);color:var(--primary);border:1px solid rgba(167,139,250,.25)}
+header h1{font-size:clamp(28px,4.5vw,44px);font-weight:900;letter-spacing:-.02em;background:linear-gradient(135deg,var(--primary),var(--secondary),var(--tertiary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header p{color:var(--muted);margin-top:10px;font-size:15px}
+
+/* ============ Hero 中央 ============ */
+.hero{position:relative;text-align:center;padding:36px 0 24px}
+.hero-icon{font-size:64px;background:linear-gradient(135deg,var(--primary),var(--tertiary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:floaty 4s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero-quote{font-size:clamp(16px,2.2vw,21px);font-weight:300;line-height:1.9;max-width:640px;margin:24px auto 0;color:var(--fg)}
+.hero-quote .em{font-weight:900;background:linear-gradient(120deg,var(--primary),var(--tertiary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cursor{display:inline-block;width:2px;height:1em;background:var(--primary);vertical-align:text-bottom;margin-left:3px;animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* 倒计时 / 状态条 */
+.status-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin:28px auto 0;padding:8px 18px;border-radius:999px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);width:fit-content;font-size:13px;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 10px var(--primary);animation:pulse 1.6s ease infinite}
+@keyframes pulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.4)}}
+
+/* ============ 分区通用 ============ */
+.section-title{display:flex;align-items:center;gap:12px;margin:56px 0 24px}
+.section-title .st-ic{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(167,139,250,.12);color:var(--primary);font-size:16px}
+.section-title h2{font-size:22px;font-weight:900;letter-spacing:-.01em}
+.section-title .st-sub{font-size:12px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace}
+
+/* ============ 愿景卡片（三大场景）============ */
+.vision-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:860px){.vision-grid{grid-template-columns:1fr}}
+.vision-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 24px;position:relative;overflow:hidden;transition:transform .35s,border-color .35s}
+.vision-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--primary),transparent);transform:scaleX(0);transform-origin:left;transition:transform .5s}
+.vision-card:hover{transform:translateY(-6px);border-color:rgba(167,139,250,.4)}
+.vision-card:hover::before{transform:scaleX(1)}
+.vc-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:18px}
+.vc-icon.w{background:rgba(167,139,250,.12);color:var(--primary)}
+.vc-icon.s{background:rgba(6,182,212,.12);color:var(--secondary)}
+.vc-icon.l{background:rgba(240,171,252,.12);color:var(--tertiary)}
+.vision-card h3{font-size:18px;font-weight:900;margin-bottom:10px}
+.vision-card .vc-tag{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted);margin-bottom:14px;letter-spacing:.04em}
+.vision-card p{font-size:13px;color:var(--muted);line-height:1.8}
+.vision-card .vc-list{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.vision-card .vc-list li{font-size:13px;color:var(--fg);list-style:none;display:flex;align-items:flex-start;gap:8px;line-height:1.6}
+.vision-card .vc-list li i{color:var(--primary);font-size:10px;margin-top:6px;flex-shrink:0}
+
+/* ============ 变革时间线（AI 带来的变革）============ */
+.revolution{display:flex;flex-direction:column;gap:0;position:relative;padding-left:8px}
+.rev-line{position:absolute;left:23px;top:14px;bottom:14px;width:2px;background:var(--border)}
+.rev-line::after{content:'';position:absolute;left:0;top:0;width:100%;height:var(--fill,0%);background:linear-gradient(180deg,var(--primary),var(--secondary));transition:height 1s ease;border-radius:2px}
+.rev-item{display:flex;gap:18px;padding:16px 0;position:relative;opacity:0;transform:translateX(-12px);transition:all .6s}
+.rev-item.show{opacity:1;transform:translateX(0)}
+.rev-dot{width:32px;height:32px;border-radius:50%;background:var(--card);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);flex-shrink:0;z-index:2;transition:all .4s}
+.rev-item.show .rev-dot{border-color:var(--primary);color:var(--primary);box-shadow:0 0 14px rgba(167,139,250,.4)}
+.rev-body{flex:1;padding-top:2px}
+.rev-body h4{font-size:15px;font-weight:900;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rev-body .rev-era{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--primary);padding:2px 8px;border-radius:6px;background:rgba(167,139,250,.1);font-weight:700}
+.rev-body p{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* ============ 数据/能力徽章 ============ */
+.cap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.cap-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;transition:all .3s}
+.cap-box:hover{border-color:rgba(167,139,250,.4);transform:translateY(-4px)}
+.cap-box .cap-ic{font-size:24px;color:var(--primary);margin-bottom:10px}
+.cap-box h4{font-size:14px;font-weight:900;margin-bottom:4px}
+.cap-box p{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ============ CTA 行动 ============ */
+.cta{margin-top:64px;background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(6,182,212,.06));border:1px solid rgba(167,139,250,.2);border-radius:20px;padding:40px 32px;text-align:center;position:relative;overflow:hidden}
+.cta::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(167,139,250,.08) 0%,transparent 50%);animation:drift 12s linear infinite}
+@keyframes drift{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.cta>*{position:relative;z-index:1}
+.cta h2{font-size:clamp(20px,3vw,28px);font-weight:900;margin-bottom:12px;background:linear-gradient(120deg,var(--primary),var(--tertiary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta p{color:var(--muted);font-size:14px;line-height:1.8;max-width:560px;margin:0 auto 24px}
+.cta-btns{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+.cta-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 26px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:all .3s;text-decoration:none;border:1.5px solid var(--border);background:var(--card);color:var(--fg);font-family:inherit}
+.cta-btn:hover{transform:translateY(-2px)}
+.cta-btn.primary{background:var(--primary);color:#070b14;border-color:var(--primary)}
+.cta-btn.primary:hover{box-shadow:0 8px 26px rgba(167,139,250,.4)}
+
+/* 页脚 */
+footer{text-align:center;margin-top:48px;color:var(--muted);font-size:12px;line-height:1.8}
+footer .wf-logo{display:inline-flex;align-items:center;gap:8px;color:var(--fg);font-weight:700;font-size:14px;margin-bottom:8px}
+footer .wf-logo i{color:var(--primary)}
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+
+<div class="app">
+  <header>
+    <span class="ch-badge"><i class="fas fa-infinity"></i> &nbsp; CHAPTER · COMING SOON</span>
+    <h1>未来，正在书写</h1>
+    <p>这不是终点，而是一场关于 AI 无限可能的崭新起点</p>
+  </header>
+
+  <!-- ============ Hero ============ -->
+  <section class="hero">
+    <div class="hero-icon"><i class="fas fa-brain"></i></div>
+    <p class="hero-quote">
+      当 <span class="em">机器学会思考</span>，当 <span class="em">代码理解意图</span>，当 <span class="em">数据涌现智慧</span> ——<br>
+      我们正在见证的，不只是一项技术的进步，<br>
+      更是人类认知边界的<span class="em">一次伟大延伸</span>。<span class="cursor"></span>
+    </p>
+    <div class="status-bar">
+      <span class="status-dot"></span>
+      <span>下一章节正在构思中 · 由 AI 与你共同创造</span>
+    </div>
+  </section>
+
+  <!-- ============ AI 变革时间线 ============ -->
+  <div class="section-title">
+    <div class="st-ic"><i class="fas fa-wave-square"></i></div>
+    <div>
+      <h2>AI 正在重塑一切</h2>
+      <div class="st-sub">THE GREAT TRANSFORMATION</div>
+    </div>
+  </div>
+  <div class="revolution">
+    <div class="rev-line" id="revLine"></div>
+    <div class="rev-item">
+      <div class="rev-dot"><i class="fas fa-pencil-alt"></i></div>
+      <div class="rev-body">
+        <h4>认知革命 <span class="rev-era">2017 →</span></h4>
+        <p>Transformer 架构诞生，机器第一次真正「读懂」语言。注意力机制让模型理解上下文、捕捉语义，NLP 从规则走向智能。</p>
+      </div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-dot"><i class="fas fa-comments"></i></div>
+      <div class="rev-body">
+        <h4>对话涌现 <span class="rev-era">2022 →</span></h4>
+        <p>大模型展现惊人能力：写诗、编程、推理、创作。AI 不再只是工具，而成为可以对话、协作的「思考伙伴」。</p>
+      </div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-dot"><i class="fas fa-user-astronaut"></i></div>
+      <div class="rev-body">
+        <h4>智能体崛起 <span class="rev-era">2024 →</span></h4>
+        <p>从「回答问题」到「自主行动」。Agent 能够规划、调用工具、完成复杂任务，AI 开始拥有「双手」。</p>
+      </div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-dot"><i class="fas fa-infinity"></i></div>
+      <div class="rev-body">
+        <h4>无限未来 <span class="rev-era">NEXT →</span></h4>
+        <p>多模态融合、具身智能、科学发现……AI 的边界仍在不断扩张。而你，正站在这一切的起点。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 三大美好场景 ============ -->
+  <div class="section-title">
+    <div class="st-ic"><i class="fas fa-wand-magic-sparkles"></i></div>
+    <div>
+      <h2>当 AI 融入日常</h2>
+      <div class="st-sub">A BEAUTIFUL FUTURE · 我们憧憬的明天</div>
+    </div>
+  </div>
+  <div class="vision-grid">
+    <div class="vision-card">
+      <div class="vc-icon w"><i class="fas fa-briefcase"></i></div>
+      <div class="vc-tag">WORK · 工作</div>
+      <h3>人机协同创作</h3>
+      <p>重复劳动交给 AI，创造性的思考留给自己。</p>
+      <ul class="vc-list">
+        <li><i class="fas fa-check"></i> AI 起草方案，人类把关决策</li>
+        <li><i class="fas fa-check"></i> 代码自动生成与审查</li>
+        <li><i class="fas fa-check"></i> 把繁琐事务自动化</li>
+        <li><i class="fas fa-check"></i> 每个人都拥有专属助手</li>
+      </ul>
+    </div>
+    <div class="vision-card">
+      <div class="vc-icon s"><i class="fas fa-graduation-cap"></i></div>
+      <div class="vc-tag">LEARN · 学习</div>
+      <h3>个性化导师</h3>
+      <p>知识不再是稀缺资源，理解力才是。</p>
+      <ul class="vc-list">
+        <li><i class="fas fa-check"></i> 因材施教的 AI 私教</li>
+        <li><i class="fas fa-check"></i> 复杂概念一键可视化</li>
+        <li><i class="fas fa-check"></i> 随时提问，永不疲倦</li>
+        <li><i class="fas fa-check"></i> 让每个人都能学懂一切</li>
+      </ul>
+    </div>
+    <div class="vision-card">
+      <div class="vc-icon l"><i class="fas fa-heart"></i></div>
+      <div class="vc-tag">LIFE · 生活</div>
+      <h3>更从容的日常</h3>
+      <p>技术隐于无形，生活回归本真。</p>
+      <ul class="vc-list">
+        <li><i class="fas fa-check"></i> 智能管家打理琐事</li>
+        <li><i class="fas fa-check"></i> 健康被持续守护</li>
+        <li><i class="fas fa-check"></i> 语言不再是障碍</li>
+        <li><i class="fas fa-check"></i> 把时间还给热爱</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ AI 能力徽章 ============ -->
+  <div class="section-title">
+    <div class="st-ic"><i class="fas fa-bolt"></i></div>
+    <div>
+      <h2>已经照进现实</h2>
+      <div class="st-sub">AI CAPABILITIES · 这些不再遥远</div>
+    </div>
+  </div>
+  <div class="cap-grid">
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-code"></i></div><h4>编写代码</h4><p>理解意图<br>生成可运行程序</p></div>
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-feather-pointed"></i></div><h4>创作写作</h4><p>文章 · 诗歌<br>剧本 · 创意</p></div>
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-image"></i></div><h4>视觉创作</h4><p>绘图 · 设计<br>视频生成</p></div>
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-language"></i></div><h4>跨语言沟通</h4><p>实时翻译<br>打破语言壁垒</p></div>
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-stethoscope"></i></div><h4>科学发现</h4><p>蛋白质折叠<br>加速科研</p></div>
+    <div class="cap-box"><div class="cap-ic"><i class="fas fa-cogs"></i></div><h4>自主任务</h4><p>规划 · 执行<br>调用工具完成目标</p></div>
+  </div>
+
+  <!-- ============ CTA ============ -->
+  <section class="cta">
+    <h2>下一章，由你定义</h2>
+    <p>这个项目还在生长。你最想看到哪个主题被可视化？你的期待，就是下一章的方向。让我们一起，把对 AI 的理解，变成看得见的光。</p>
+    <div class="cta-btns">
+      <a class="cta-btn primary" href="https://github.com/leon-ziya/Happy-LLM-learn/issues/new" target="_blank" rel="noopener">
+        <i class="fas fa-lightbulb"></i> 许愿下一章
+      </a>
+      <a class="cta-btn" href="https://github.com/leon-ziya/Happy-LLM-learn" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i> 参与共建
+      </a>
+      <a class="cta-btn" href="../index.html">
+        <i class="fas fa-arrow-left"></i> 返回首页
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wf-logo"><i class="fas fa-brain"></i> Happy-LLM-Learn</div>
+    <div>The best way to predict the future is to invent it. — Alan Kay</div>
+    <div style="margin-top:6px;opacity:.6">预测未来最好的方式，就是去创造它。</div>
+  </footer>
+</div>
+
+<script>
+/* ============ 星空粒子背景 ============ */
+(function(){
+  const c=document.getElementById('bgCanvas');
+  const ctx=c.getContext('2d');
+  let w,h,stars=[];
+  function resize(){
+    w=c.width=window.innerWidth;
+    h=c.height=window.innerHeight;
+    const count=Math.min(160,Math.floor(w*h/9000));
+    stars=[];
+    for(let i=0;i<count;i++){
+      stars.push({
+        x:Math.random()*w,y:Math.random()*h,
+        r:Math.random()*1.4+0.3,
+        a:Math.random()*0.6+0.2,
+        sp:Math.random()*0.5+0.1,
+        tw:Math.random()*Math.PI*2,
+        hue:Math.random()<0.3?'167,139,250':(Math.random()<0.5?'6,182,212':'240,171,252')
+      });
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    for(const s of stars){
+      s.tw+=0.03;
+      s.y+=s.sp*0.3;
+      if(s.y>h){s.y=0;s.x=Math.random()*w}
+      const alpha=s.a*(0.5+Math.sin(s.tw)*0.5);
+      // 光晕
+      const haloR=Math.max(1,s.r*3);
+      const g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,haloR);
+      g.addColorStop(0,`rgba(${s.hue},${alpha*0.5})`);
+      g.addColorStop(1,`rgba(${s.hue},0)`);
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(s.x,s.y,haloR,0,Math.PI*2);ctx.fill();
+      // 星点
+      ctx.fillStyle=`rgba(${s.hue},${alpha})`;
+      ctx.beginPath();ctx.arc(s.x,s.y,Math.max(0.4,s.r),0,Math.PI*2);ctx.fill();
+    }
+    // 偶尔的连线（流星感）
+    for(let i=0;i<stars.length;i++){
+      for(let j=i+1;j<stars.length;j++){
+        const d=Math.hypot(stars[i].x-stars[j].x,stars[i].y-stars[j].y);
+        if(d<90){
+          ctx.strokeStyle=`rgba(167,139,250,${(1-d/90)*0.08})`;
+          ctx.lineWidth=0.5;
+          ctx.beginPath();ctx.moveTo(stars[i].x,stars[i].y);ctx.lineTo(stars[j].x,stars[j].y);ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',resize);
+  resize();draw();
+})();
+
+/* ============ 变革时间线渐进展开 ============ */
+(function(){
+  const items=document.querySelectorAll('.rev-item');
+  const line=document.getElementById('revLine');
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach((en,idx)=>{
+      if(en.isIntersecting){
+        const order=Array.from(items).indexOf(en.target);
+        setTimeout(()=>en.target.classList.add('show'),order*180);
+        io.unobserve(en.target);
+      }
+    });
+  },{threshold:0.3});
+  items.forEach(it=>io.observe(it));
+  // 进度线填充
+  const lineIO=new IntersectionObserver((entries)=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){line.style.setProperty('--fill','100%');}
+    });
+  },{threshold:0.4});
+  lineIO.observe(document.querySelector('.revolution'));
+})();
+</script>
+</body>
+</html>

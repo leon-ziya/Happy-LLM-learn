@@ -1,0 +1,2033 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第三章 · 预训练语言模型 — 交互可视化</title>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<style>
+/* ========== 全局变量 ========== */
+:root {
+  --bg: #070b14;
+  --fg: #e8ecf4;
+  --muted: #6b7a94;
+  --primary: #00e5a0;      /* Encoder-Only / NLU  — 青绿 */
+  --secondary: #f59e0b;    /* Decoder-Only / NLG  — 琥珀 */
+  --tertiary: #38bdf8;     /* Encoder-Decoder     — 亮青 */
+  --card: #0f1724;
+  --border: #1a2540;
+  --card-soft: #131c2e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 粒子 Canvas 背景 */
+#particle-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ========== 容器 ========== */
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+/* ========== 顶部标题区 ========== */
+.hero {
+  text-align: center;
+  padding: 28px 0 24px;
+  position: relative;
+}
+.hero .chapter-tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 4px;
+  color: var(--primary);
+  padding: 6px 14px;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  margin-bottom: 18px;
+  background: rgba(0, 229, 160, 0.06);
+}
+.hero h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, var(--primary), var(--tertiary) 50%, var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 12px;
+}
+.hero p.subtitle {
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ========== 模式切换按钮 ========== */
+.mode-switch {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 28px 0 36px;
+  flex-wrap: wrap;
+}
+.mode-btn {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 10px 22px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mode-btn i { font-size: 13px; }
+.mode-btn:hover {
+  color: var(--fg);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+.mode-btn.active {
+  color: var(--bg);
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 18px rgba(0, 229, 160, 0.35);
+}
+
+/* ========== 模式容器 ========== */
+.mode-panel { display: none; animation: fade-in 0.4s ease; }
+.mode-panel.active { display: block; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== 模式一：流程演示 ========== */
+/* 管道导航 */
+.pipeline-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 auto 30px;
+  max-width: 1100px;
+  position: relative;
+  padding: 0 12px;
+}
+.pipeline-line {
+  position: absolute;
+  top: 16px;
+  left: 36px;
+  right: 36px;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+.pipeline-line .progress {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--tertiary), var(--secondary));
+  width: 0%;
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+.pipeline-node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex: 1;
+}
+.pipeline-node .dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: all 0.3s ease;
+}
+.pipeline-node .label {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.pipeline-node:hover .dot {
+  border-color: var(--primary);
+  color: var(--fg);
+}
+.pipeline-node.active .dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--bg);
+  transform: scale(1.25);
+  box-shadow: 0 0 22px rgba(0, 229, 160, 0.55);
+}
+.pipeline-node.active .label { color: var(--primary); font-weight: 700; }
+.pipeline-node.done .dot {
+  background: rgba(0, 229, 160, 0.25);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* 双栏面板 */
+.dual-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-bottom: 28px;
+}
+@media (max-width: 900px) {
+  .dual-panel { grid-template-columns: 1fr; }
+}
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  min-height: 380px;
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 18px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.panel-title i { color: var(--primary); }
+
+/* 左侧：架构全景图 */
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+.arch-block {
+  width: 100%;
+  max-width: 320px;
+  padding: 14px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-soft);
+  text-align: center;
+  transition: all 0.35s ease;
+  position: relative;
+}
+.arch-block .b-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.arch-block .b-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+.arch-block.role-primary { border-color: rgba(0, 229, 160, 0.35); }
+.arch-block.role-secondary { border-color: rgba(245, 158, 11, 0.35); }
+.arch-block.role-tertiary { border-color: rgba(56, 189, 248, 0.35); }
+.arch-block.active {
+  transform: scale(1.04);
+  box-shadow: 0 0 28px rgba(0, 229, 160, 0.25);
+}
+.arch-block.active.role-primary { border-color: var(--primary); background: rgba(0, 229, 160, 0.08); }
+.arch-block.active.role-secondary { border-color: var(--secondary); background: rgba(245, 158, 11, 0.08); box-shadow: 0 0 28px rgba(245, 158, 11, 0.25); }
+.arch-block.active.role-tertiary { border-color: var(--tertiary); background: rgba(56, 189, 248, 0.08); box-shadow: 0 0 28px rgba(56, 189, 248, 0.25); }
+
+.arch-arrow {
+  color: var(--muted);
+  font-size: 18px;
+  animation: pulse-arrow 1.5s ease infinite;
+}
+@keyframes pulse-arrow {
+  0%, 100% { opacity: 0.5; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(2px); }
+}
+
+.arch-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  justify-content: center;
+}
+.arch-row .arch-block { flex: 1; max-width: none; padding: 10px 8px; }
+.arch-row .arch-block .b-label { font-size: 11px; }
+
+/* 右侧：数据变换可视化 */
+.viz-area {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.viz-caption {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Token 盒子 */
+.token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.token-box {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  background: rgba(0, 229, 160, 0.12);
+  border: 1px solid rgba(0, 229, 160, 0.3);
+  opacity: 0;
+  transform: translateY(12px);
+  animation: token-in 0.5s ease forwards;
+}
+.token-box.masked {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+.token-box.special {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--tertiary);
+  color: var(--tertiary);
+}
+.token-box.id {
+  background: rgba(107, 122, 148, 0.15);
+  border-color: var(--muted);
+  color: var(--muted);
+  font-size: 11px;
+}
+@keyframes token-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 向量条 */
+.vector-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 140px;
+  justify-content: center;
+  padding: 0 10px;
+}
+.v-bar {
+  width: 18px;
+  background: linear-gradient(180deg, var(--primary), rgba(0, 229, 160, 0.3));
+  border-radius: 4px 4px 0 0;
+  transform: scaleX(0);
+  transform-origin: bottom;
+  animation: bar-in 0.6s ease forwards;
+  position: relative;
+}
+.v-bar .v-val {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--muted);
+}
+@keyframes bar-in {
+  to { transform: scaleX(1); }
+}
+
+/* 注意力热力图 */
+.attn-grid {
+  display: grid;
+  gap: 3px;
+  justify-content: center;
+  margin: 8px auto;
+}
+.attn-cell {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--fg);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  position: relative;
+}
+.attn-cell:hover { transform: scale(1.15); z-index: 5; }
+.attn-cell .tip {
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+.attn-cell:hover .tip { opacity: 1; }
+
+/* 掩码网格 */
+.mask-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.mask-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  animation: token-in 0.4s ease forwards;
+}
+.mask-cell.visible { background: rgba(0, 229, 160, 0.18); color: var(--primary); border: 1px solid rgba(0, 229, 160, 0.4); }
+.mask-cell.masked { background: rgba(245, 158, 11, 0.18); color: var(--secondary); border: 1px solid rgba(245, 158, 11, 0.4); }
+.mask-cell.future { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+/* 流程步骤方块 */
+.flow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  opacity: 0;
+  transform: translateX(-12px);
+  animation: flow-in 0.5s ease forwards;
+}
+@keyframes flow-in {
+  to { opacity: 1; transform: translateX(0); }
+}
+.flow-step .step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(0, 229, 160, 0.15);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.flow-step .step-text {
+  font-size: 13px;
+  color: var(--fg);
+}
+.flow-step .step-text small { color: var(--muted); font-size: 11px; display: block; }
+
+/* 对比卡片 */
+.compare-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.compare-card {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.compare-card.c-primary { border-color: rgba(0, 229, 160, 0.35); }
+.compare-card.c-secondary { border-color: rgba(245, 158, 11, 0.35); }
+.compare-card.c-tertiary { border-color: rgba(56, 189, 248, 0.35); }
+.compare-card .c-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.compare-card.c-primary .c-title { color: var(--primary); }
+.compare-card.c-secondary .c-title { color: var(--secondary); }
+.compare-card.c-tertiary .c-title { color: var(--tertiary); }
+.compare-card .c-text { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* 残差连接图 */
+.residual-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  position: relative;
+  padding: 10px;
+}
+.res-block {
+  width: 80%;
+  max-width: 240px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.res-arrow-bypass {
+  position: relative;
+  width: 100%;
+  height: 30px;
+}
+.res-arrow-bypass::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  top: 0;
+  width: 76%;
+  height: 100%;
+  border: 2px dashed var(--secondary);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+}
+.res-arrow-bypass::after {
+  content: '残差';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--secondary);
+  background: var(--card);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 步骤说明区 */
+.step-detail {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 22px;
+  position: relative;
+  overflow: hidden;
+}
+.step-detail::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--primary), var(--tertiary));
+}
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.step-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.step-titles h2 {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 2px;
+}
+.step-titles .step-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+}
+.step-body {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #c7d0e0;
+}
+.step-body p { margin-bottom: 12px; }
+.highlight-text { font-weight: 700; padding: 0 3px; border-radius: 3px; }
+.highlight-text.p { color: var(--primary); background: rgba(0, 229, 160, 0.1); }
+.highlight-text.s { color: var(--secondary); background: rgba(245, 158, 11, 0.1); }
+.highlight-text.t { color: var(--tertiary); background: rgba(56, 189, 248, 0.1); }
+.step-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  background: rgba(0, 229, 160, 0.08);
+  color: var(--primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 229, 160, 0.2);
+}
+.step-body .stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.stat-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 6px 12px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+}
+.stat-chip strong { color: var(--primary); }
+
+/* 导航按钮 */
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+.nav-btn {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 12px 22px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: rgba(0, 229, 160, 0.08);
+  transform: translateY(-2px);
+}
+.nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.nav-btn.next { color: var(--primary); }
+
+/* ========== 模式二：组件详解 ========== */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.model-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.model-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.model-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 24px rgba(0, 229, 160, 0.12);
+}
+.model-card:hover::before { opacity: 1; }
+.model-card.c-secondary:hover { border-color: var(--secondary); box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12); }
+.model-card.c-secondary::before { background: linear-gradient(90deg, transparent, var(--secondary), transparent); }
+.model-card.c-tertiary:hover { border-color: var(--tertiary); box-shadow: 0 8px 24px rgba(56, 189, 248, 0.12); }
+.model-card.c-tertiary::before { background: linear-gradient(90deg, transparent, var(--tertiary), transparent); }
+
+.model-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-bottom: 14px;
+}
+.model-icon.p { background: rgba(0, 229, 160, 0.12); color: var(--primary); }
+.model-icon.s { background: rgba(245, 158, 11, 0.12); color: var(--secondary); }
+.model-icon.t { background: rgba(56, 189, 248, 0.12); color: var(--tertiary); }
+
+.model-card h3 {
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+.model-card .model-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+.model-card .model-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.model-card .model-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.model-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.model-tag.p { color: var(--primary); border-color: rgba(0, 229, 160, 0.3); }
+.model-tag.s { color: var(--secondary); border-color: rgba(245, 158, 11, 0.3); }
+.model-tag.t { color: var(--tertiary); border-color: rgba(56, 189, 248, 0.3); }
+
+/* 弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 11, 20, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.modal-overlay.show { display: flex; opacity: 1; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 32px;
+  position: relative;
+  transform: translateY(20px) scale(0.97);
+  transition: transform 0.35s ease;
+}
+.modal-overlay.show .modal { transform: translateY(0) scale(1); }
+.modal::-webkit-scrollbar { width: 8px; }
+.modal::-webkit-scrollbar-track { background: var(--card-soft); }
+.modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.modal-close:hover { color: var(--secondary); border-color: var(--secondary); transform: rotate(90deg); }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-right: 50px;
+}
+.modal-header .model-icon { width: 56px; height: 56px; font-size: 22px; }
+.modal-header h2 { font-size: 24px; font-weight: 900; }
+.modal-header .modal-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+.modal-section { margin-bottom: 24px; }
+.modal-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.modal-section h3 i { color: var(--primary); }
+.modal-section.s h3 i { color: var(--secondary); }
+.modal-section.t h3 i { color: var(--tertiary); }
+.modal-section p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #c7d0e0;
+  margin-bottom: 8px;
+}
+.modal-section ul {
+  list-style: none;
+  padding-left: 0;
+}
+.modal-section ul li {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #c7d0e0;
+  padding-left: 18px;
+  position: relative;
+  margin-bottom: 6px;
+}
+.modal-section ul li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+}
+.modal-section code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  background: rgba(0, 229, 160, 0.08);
+  color: var(--primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 229, 160, 0.2);
+}
+.modal-section .code-block {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  color: var(--fg);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.mini-viz {
+  background: var(--card-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 8px;
+}
+
+/* 比较表 */
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.compare-table th, .compare-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.compare-table th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+.compare-table td { color: #c7d0e0; }
+.compare-table td:first-child { color: var(--primary); font-weight: 700; }
+.compare-table tr:hover { background: rgba(0, 229, 160, 0.04); }
+
+/* 底部 */
+.footer-note {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.footer-note .legend {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.legend-dot.p { background: var(--primary); }
+.legend-dot.s { background: var(--secondary); }
+.legend-dot.t { background: var(--tertiary); }
+
+@media (max-width: 600px) {
+  .container { padding: 16px 14px 60px; }
+  .step-detail, .panel { padding: 18px; }
+  .pipeline-node .label { font-size: 10px; }
+  .compare-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<div class="container">
+
+  <!-- 顶部标题 -->
+  <div class="hero">
+    <span class="chapter-tag">CHAPTER 03 · PLM</span>
+    <h1>预训练语言模型</h1>
+    <p class="subtitle">从 BERT 到 GPT、从 T5 到 LLaMA — Transformer 时代三大架构的演进与核心思想可视化解析</p>
+  </div>
+
+  <!-- 模式切换 -->
+  <div class="mode-switch">
+    <button class="mode-btn active" data-mode="flow">
+      <i class="fa-solid fa-diagram-project"></i> 流程演示
+    </button>
+    <button class="mode-btn" data-mode="component">
+      <i class="fa-solid fa-cubes"></i> 组件详解
+    </button>
+  </div>
+
+  <!-- ============ 模式一：流程演示 ============ -->
+  <div class="mode-panel active" id="mode-flow">
+
+    <!-- 管道导航 -->
+    <div class="pipeline-nav" id="pipeline-nav">
+      <div class="pipeline-line"><div class="progress" id="pipeline-progress"></div></div>
+      <!-- 节点由 JS 渲染 -->
+    </div>
+
+    <!-- 双栏面板 -->
+    <div class="dual-panel">
+      <!-- 左：架构全景图 -->
+      <div class="panel">
+        <div class="panel-title">
+          <i class="fa-solid fa-sitemap"></i> 架构全景图
+        </div>
+        <div id="arch-diagram" class="arch-diagram">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+      <!-- 右：数据变换可视化 -->
+      <div class="panel">
+        <div class="panel-title">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> 数据变换可视化
+        </div>
+        <div id="viz-area" class="viz-area">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤说明 -->
+    <div class="step-detail" id="step-detail">
+      <!-- 由 JS 渲染 -->
+    </div>
+
+    <!-- 导航 -->
+    <div class="nav-buttons">
+      <button class="nav-btn prev" id="prev-btn">
+        <i class="fa-solid fa-arrow-left"></i> 上一步
+      </button>
+      <button class="nav-btn next" id="next-btn">
+        下一步 <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ 模式二：组件详解 ============ -->
+  <div class="mode-panel" id="mode-component">
+    <div class="model-grid" id="model-grid">
+      <!-- 由 JS 渲染 -->
+    </div>
+  </div>
+
+  <!-- 底部说明 -->
+  <div class="footer-note">
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot p"></span> Encoder-Only · NLU</div>
+      <div class="legend-item"><span class="legend-dot t"></span> Encoder-Decoder · 统一</div>
+      <div class="legend-item"><span class="legend-dot s"></span> Decoder-Only · NLG</div>
+    </div>
+    <div>Happy LLM v1.0.1 · 第三章 · 预训练语言模型  |  可视化交互学习页</div>
+  </div>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close" aria-label="关闭">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+/* ========== 数据：流程步骤 ========== */
+const STEPS = [
+  {
+    id: 0,
+    label: '原始文本',
+    tag: 'INPUT · CORPUS',
+    archRole: 'primary',
+    arch: [
+      { label: '互联网语料', sub: 'Wikipedia · Books · CC', role: 'primary' },
+      { label: 'Tokenizer 分词器', sub: 'WordPiece / BPE', role: 'primary' }
+    ],
+    viz: 'tokens',
+    title: '原始语料与分词',
+    body: `<p>预训练语言模型的起点是<span class="highlight-text p">海量无监督语料</span>。BERT 使用了 <strong>3.3B token</strong>（13GB），RoBERTa 扩到 <strong>160GB</strong>，T5 的 C4 数据集 <strong>750GB</strong>，GPT-3 更达 <strong>570GB</strong>（清洗前 45TB），LLaMA-3 高达 <strong>15T token</strong>。</p>
+    <p>语料经 <code>tokenizer</code> 转为 <code>input_ids</code>。BERT 采用 <span class="highlight-text p">WordPiece</span>（词表 30K），将单词拆为子词（如 playing → play + ##ing）；RoBERTa 改用 <span class="highlight-text p">BPE</span>（词表 50K），以字节对作为分词单位；LLaMA-3 使用 128K 词表的高效 tokenizer。</p>
+    <div class="stat-row">
+      <span class="stat-chip">BERT: <strong>3.3B token</strong></span>
+      <span class="stat-chip">RoBERTa: <strong>160GB</strong></span>
+      <span class="stat-chip">T5 C4: <strong>750GB</strong></span>
+      <span class="stat-chip">GPT-3: <strong>570GB</strong></span>
+      <span class="stat-chip">LLaMA-3: <strong>15T token</strong></span>
+    </div>`
+  },
+  {
+    id: 1,
+    label: 'Embedding',
+    tag: 'EMBEDDING · TOKEN → VECTOR',
+    archRole: 'primary',
+    arch: [
+      { label: 'input_ids', sub: '[101, 1045, 2009, 102]', role: 'tertiary' },
+      { label: 'Token Embedding', sub: 'V×H 矩阵查表', role: 'primary' },
+      { label: 'Positional Embedding', sub: '位置编码', role: 'primary' },
+      { label: 'hidden_states', sub: 'H 维向量序列', role: 'primary' }
+    ],
+    viz: 'vector',
+    title: 'Embedding 层 — 离散 ID 到稠密向量',
+    body: `<p>分词后的 <code>input_ids</code> 通过 Embedding 层映射为 <span class="highlight-text p">H 维稠密向量</span>。Embedding 矩阵形状为 <code>(vocab_size, hidden_size)</code>。BERT-base 的 H=768，BERT-large、RoBERTa、T5-large 的 H=1024，GPT-3 的 H 高达 12288。</p>
+    <p>位置编码补充序列顺序信息。BERT 用<span class="highlight-text p">可训练的相对位置编码</span>融合进注意力；GPT 沿用 Transformer 的 <span class="highlight-text s">Sinusoidal 正弦余弦编码</span>；T5 使用相对位置编码；LLaMA 引入 <span class="highlight-text s">RoPE 旋转位置编码</span>。</p>
+    <p>ALBERT 提出关键优化：将 Embedding 输出维度从 H 解绑为 E=128，再通过线性层升维到 H，参数量从 <code>V×H</code> 降至 <code>V×E + E×H</code>，当 E≪H 时节省巨大。</p>
+    <div class="stat-row">
+      <span class="stat-chip">BERT-base: <strong>H=768</strong></span>
+      <span class="stat-chip">BERT-large: <strong>H=1024</strong></span>
+      <span class="stat-chip">ALBERT: <strong>E=128</strong></span>
+      <span class="stat-chip">GPT-3: <strong>H=12288</strong></span>
+    </div>`
+  },
+  {
+    id: 2,
+    label: 'Encoder / Decoder',
+    tag: 'CORE · N×LAYER STACK',
+    archRole: 'tertiary',
+    arch: [
+      { label: 'Encoder Block (N层堆叠)', sub: 'BERT / RoBERTa / ALBERT', role: 'primary' },
+      { label: 'Encoder-Decoder', sub: 'T5', role: 'tertiary' },
+      { label: 'Decoder Block (N层堆叠)', sub: 'GPT / LLaMA / GLM', role: 'secondary' }
+    ],
+    viz: 'compare-arch',
+    title: '三大架构对比 — Encoder / Encoder-Decoder / Decoder',
+    body: `<p>这是预训练语言模型最核心的架构分野，决定了模型的能力方向：</p>
+    <p><span class="highlight-text p">Encoder-Only（BERT 系）</span>：仅堆叠 Encoder，每层 Token 间双向注意力，擅长<span class="highlight-text p">文本理解 NLU</span>（分类、序列标注、问答匹配），输出 Label。</p>
+    <p><span class="highlight-text t">Encoder-Decoder（T5）</span>：编码器理解输入，解码器生成输出，通过 Cross-Attention 交互。适配 <span class="highlight-text t">Seq2Seq 任务</span>（翻译、摘要），并提出 Text-to-Text 大一统思想。</p>
+    <p><span class="highlight-text s">Decoder-Only（GPT 系）</span>：仅堆叠 Decoder，使用带掩码的自注意力（每个 token 只能看上文），天生适合<span class="highlight-text s">文本生成 NLG</span>，是当今所有主流 LLM 的基础架构。</p>
+    <div class="stat-row">
+      <span class="stat-chip">BERT-large: <strong>24 层 Encoder</strong></span>
+      <span class="stat-chip">GPT-3: <strong>96 层 Decoder</strong></span>
+      <span class="stat-chip">T5-large: <strong>24+24 层</strong></span>
+    </div>`
+  },
+  {
+    id: 3,
+    label: 'Attention',
+    tag: 'SELF-ATTENTION · MASK',
+    archRole: 'primary',
+    arch: [
+      { label: 'Q · K · V', sub: '三个线性投影', role: 'primary' },
+      { label: 'Attention Score', sub: 'softmax(QKᵀ/√d)', role: 'primary' },
+      { label: 'Mask 掩码', sub: '决定可见范围', role: 'primary' }
+    ],
+    viz: 'attention-mask',
+    title: '注意力机制与掩码 — 三种架构的关键差异',
+    body: `<p>注意力计算公式 <code>softmax(QKᵀ/√d) · V</code> 在三种架构中一致，差异在 <span class="highlight-text p">Mask 掩码策略</span>：</p>
+    <p><span class="highlight-text p">BERT（双向）</span>：所有 token 互相可见，无未来掩码。MLM 任务下被 [MASK] 的位置预测时利用上下文双向信息。</p>
+    <p><span class="highlight-text t">T5 编码器双向 / 解码器因果</span>：编码器无掩码（双向），解码器用三角掩码（仅看上文），并通过 Cross-Attention 关注编码器输出。</p>
+    <p><span class="highlight-text s">GPT / LLaMA（因果）</span>：严格下三角掩码，每个 token 只能关注自身及之前的位置，保证自回归生成的合法性。</p>
+    <p>另外，BERT 在注意力分数计算后通过 <code>Position Embedding</code> 线性层融入相对位置信息；LLaMA 使用 <span class="highlight-text s">RoPE 旋转位置编码</span>；T5 使用相对位置偏置；GPT 沿用绝对 Sinusoidal 编码。</p>`
+  },
+  {
+    id: 4,
+    label: '预训练任务',
+    tag: 'PRETRAIN · MLM / CLM / GLM',
+    archRole: 'secondary',
+    arch: [
+      { label: 'MLM 掩码语言模型', sub: 'BERT · 完形填空', role: 'primary' },
+      { label: 'CLM 因果语言模型', sub: 'GPT · 续写下文', role: 'secondary' },
+      { label: 'GLM 空白填充', sub: 'GLM · MLM+CLM 融合', role: 'tertiary' }
+    ],
+    viz: 'pretrain-tasks',
+    title: '预训练任务 — 三大流派的根本差异',
+    body: `<p><span class="highlight-text p">MLM（Masked Language Model）</span>：随机遮蔽 15% token，让模型根据上下文预测。BERT 的 MLM 把这 15% 拆为 <code>80% [MASK] + 10% 随机替换 + 10% 不变</code>，最后一项消除预训练与微调不一致。BERT 还有 <span class="highlight-text p">NSP（下一句预测）</span>，判断两句是否连续；ALBERT 改进为 <span class="highlight-text p">SOP（顺序预测）</span>，负例为正例的两句交换顺序，难度更高；RoBERTa 直接去掉 NSP。</p>
+    <p><span class="highlight-text s">CLM（Causal Language Model）</span>：基于前文预测下一个 token，是 N-gram 的扩展。CLM 与人类写作习惯一致，训练与下游任务完全匹配，可利用任意自然语言语料。<code>input: 今天天气 → output: 今天天气很</code>，循环生成得到目标序列。</p>
+    <p><span class="highlight-text t">GLM（自回归空白填充）</span>：遮蔽连续多 token，外部用 MLM 思想（上下文双向），内部用 CLM 思想（按序重建）。<code>I [MASK] because you [MASK] → love you / are a wonderful person</code>。该任务融合 NLU+NLG，但 LLM 时代 CLM 大规模优势凸显，ChatGLM2 起回归 CLM。</p>
+    <p>T5 使用 <span class="highlight-text t">BERT-style MLM</span> 但把被遮蔽 token 作为 Decoder 目标序列，配合 Text-to-Text 统一框架。</p>`
+  },
+  {
+    id: 5,
+    label: '微调 / 推理',
+    tag: 'FINE-TUNE · DOWNSTREAM',
+    archRole: 'secondary',
+    arch: [
+      { label: '预训练权重', sub: '通用语义能力', role: 'secondary' },
+      { label: '下游任务微调', sub: '少量有监督数据', role: 'secondary' },
+      { label: 'Prediction Head', sub: '任务适配层', role: 'tertiary' }
+    ],
+    viz: 'finetune-modes',
+    title: '下游任务适配 — 三种范式',
+    body: `<p><span class="highlight-text p">预训练+微调（BERT 系）</span>：BERT 在 <code>[CLS]</code> 位置加入特殊 token 代表句级语义，针对文本分类直接替换 <code>prediction_heads</code> 分类头；序列标注可集成多层隐含向量；生成任务可取 Encoder 输出直接解码。BERT 在 11 个 NLP 赛道取得 SOTA。</p>
+    <p><span class="highlight-text t">Text-to-Text 统一（T5）</span>：所有任务统一为输入文本→输出文本，加任务前缀。例如 <code>classify: 这是很好的产品 → 正面</code>、<code>translate English to French: How are you? → Comment ça va?</code>。同一模型处理分类、翻译、摘要、问答等所有任务。</p>
+    <p><span class="highlight-text s">Zero/Few-shot（GPT 系）</span>：GPT-2 提出 zero-shot（不微调，仅描述任务），GPT-3 提出 few-shot / 上下文学习（In-context Learning），在 prompt 中给 3-5 个示例即可让 175B 模型完成任务，远超预训练-微调范式的效率，是 LLM 的核心优势。</p>
+    <p>ChatGPT 在 GPT-3 基础上引入<span class="highlight-text s">预训练-指令微调-RLHF</span>三阶段训练，开启大模型时代。</p>`
+  }
+];
+
+/* ========== 数据：组件卡片 ========== */
+const MODELS = [
+  {
+    id: 'bert',
+    name: 'BERT',
+    fullname: 'Bidirectional Encoder Representations from Transformers',
+    icon: 'fa-solid fa-book-open-reader',
+    color: 'p',
+    meta: 'Google · 2018 · Encoder-Only',
+    desc: 'Encoder-Only 架构，提出 MLM + NSP 预训练任务，奠定预训练-微调范式，11 个 NLP 任务 SOTA。',
+    tags: ['Encoder-Only', 'MLM', 'NSP', 'WordPiece', 'NLU'],
+    definition: 'BERT 是 Google 于 2018 年发布的预训练语言模型，取 Transformer 的 Encoder 堆叠而成，专为自然语言理解（NLU）任务打造。其统一了 Transformer 架构与预训练+微调范式两大核心思想，在 GLUE、MultiNLI 等七个 NLP 评测任务上取得 SOTA，是 NLP 领域里程碑式成果。',
+    composition: [
+      'Embedding 层：Token + Position Embedding，BERT 用可训练相对位置编码',
+      'N 层 Encoder Layer（base: 12层/768维/110M，large: 24层/1024维/340M）',
+      '每层 Encoder：Multi-Head Self-Attention → 残差+LayerNorm → Intermediate 线性层+GELU → 残差+LayerNorm',
+      'prediction_heads：线性层+激活函数，输出维度等于任务类别数',
+      '特殊 token [CLS]：位于句首，作为句级语义表征输入分类器'
+    ],
+    code: `# BERT MLM 输入示例
+输入:  I <MASK> you because you are <MASK>
+输出:  <MASK> - love;  <MASK> - wonderful
+
+# 15% 选中的 token 拆分策略
+80% → [MASK]
+10% → 随机替换为任意 token
+10% → 保持不变  # 消除预训练-微调不一致
+
+# 训练规模
+语料: 800M BooksCorpus + 2500M 英文维基百科
+总量: 3.3B token / 13GB
+硬件: 64 块 TPU × 4 天 (Large 版本)`,
+    insight: 'BERT 像"完形填空"：遮住一句话里若干词，让学生根据上下文猜词。因为既能看上文又能看下文，所以学到的语义是"双向"的 — 这正是 BERT 名字中 Bidirectional 的含义。但它和下游任务不一致（下游没有 [MASK]），所以才有 10% 保持不变的策略来缓解。',
+    miniViz: 'mlm'
+  },
+  {
+    id: 'roberta',
+    name: 'RoBERTa',
+    fullname: 'A Robustly Optimized BERT Pretraining Approach',
+    icon: 'fa-solid fa-bolt',
+    color: 'p',
+    meta: 'Facebook · 2019 · Encoder-Only',
+    desc: '在 BERT 架构上优化：去掉 NSP、动态遮蔽、160GB 数据、8K batch、BPE 50K 词表。',
+    tags: ['Encoder-Only', 'MLM', '动态遮蔽', 'BPE 50K', '大 batch'],
+    definition: 'RoBERTa 是 Facebook 于 2019 年发布的 BERT 改进版，模型架构与 BERT-large 完全一致（24 层 Encoder，1024 隐藏维度，340M 参数）。它系统性地反思了 BERT 的训练策略，通过三个关键优化证明了"更大数据、更大 batch、更优任务"的威力，刷新了多个下游任务的 SOTA。',
+    composition: [
+      '优化一 · 去掉 NSP：实验对比四组（段落+NSP / 文档对+NSP / 跨文档MLM / 单文档MLM），单文档 MLM 最佳，证明 NSP 太简单反而有负面效果',
+      '优化一 · 动态遮蔽：把 Mask 从数据处理阶段移到训练阶段，每个 Epoch 的 Mask 位置都不同（BERT 静态 Mask 4 次重复）',
+      '优化二 · 数据扩到 160GB（10× BERT）：BookCorpus + 英文维基 + CC-NEWS + OPENWEBTEXT + STORIES',
+      '优化二 · 大 batch：8K（vs BERT 256），训练 500K Step ≈ 66 Epoch；全程 512 上下文长度',
+      '优化三 · BPE 50K 词表（vs BERT 30K WordPiece），提升编码能力',
+      '硬件：1024 块 V100（32GB）训练 1 天'
+    ],
+    code: `# RoBERTa vs BERT 关键对比
+            BERT              RoBERTa
+语料规模    13GB (3.3B tok)   160GB (10×)
+batch size  256               8K
+训练步数    1M (40 Epoch)     500K (66 Epoch)
+NSP 任务    ✓                 ✗ (去掉)
+Mask 策略   静态 (4 次)        动态 (每 Epoch)
+词表        30K WordPiece     50K BPE
+上下文长度  128 主训 + 512     全程 512`,
+    insight: 'RoBERTa 的故事告诉我们：BERT 的架构本身没毛病，问题在"训练得不够狠"。当我们把数据放大 10 倍、batch 放大 32 倍、再去掉无用的 NSP 任务，同样的架构就能再上一层楼 — 这也是后来 LLM"力大砖飞"哲学的预演。',
+    miniViz: 'compare-bert-roberta'
+  },
+  {
+    id: 'albert',
+    name: 'ALBERT',
+    fullname: 'A Lite BERT for Self-supervised Learning',
+    icon: 'fa-solid fa-feather',
+    color: 'p',
+    meta: 'Google · 2020 · Encoder-Only',
+    desc: '通过 Embedding 分解、跨层参数共享、SOP 任务三大优化，以 59M 参数超越 334M 的 BERT。',
+    tags: ['Encoder-Only', '参数共享', 'Embedding 分解', 'SOP', '轻量化'],
+    definition: 'ALBERT 是 Google 于 2020 年提出的轻量化 BERT 改进版。它逆向思考了一个问题：能否在保持模型能力的前提下减少参数量？通过三项创新，ALBERT 以 59M 参数（仅为 BERT-large 的 1/6）实现了超越 BERT-large 的性能，并为打造"更宽但更轻"的模型提供了重要参考。',
+    composition: [
+      '优化一 · Embedding 参数分解：将 V×H 分解为 V×E + E×H，E=128 远小于 H=1024。原始 BERT-large 的 Embedding 参数 30M，扩展到 H=2048 时膨胀到 61M；分解后大幅缩减',
+      '优化二 · 跨层参数共享：24 个 Encoder Layer 共享同一组参数（计算 24 次但只存一份），ALBERT-xlarge（24层/2048维）仅 59M 参数优于 BERT-large（334M）',
+      '优化三 · SOP（Sentence Order Prediction）替代 NSP：NSP 负例从不同文档抽取太简单；SOP 负例为正例两句交换顺序，模型需学习句序关系',
+      '代价：参数虽小，但计算时仍需 24 次前向传播，训练/推理速度不快，最终未能取代 BERT'
+    ],
+    code: `# Embedding 参数分解对比
+原始 BERT:    参数 = V × H = 30K × 1024 = 30.7M
+ALBERT:       参数 = V × E + E × H
+            = 30K × 128 + 128 × 1024
+            = 3.84M + 0.13M ≈ 4M   (省 87%)
+
+# 跨层参数共享
+BERT-large:   24 层 × 独立参数 = 334M
+ALBERT-xlarge: 1 份参数 × 24 次计算 = 59M (H=2048)
+
+# SOP 任务示例
+正例:  [I love you.] [Because you are wonderful.]  → 1
+负例:  [Because you are wonderful.] [I love you.]   → 0  (顺序颠倒)`,
+    insight: 'ALBERT 是"参数减肥大师"：发现 24 层 Encoder 学到的东西高度雷同，那就只学一份、用 24 次；发现 Embedding 不需要那么宽，就先压到 128 维再升回去。虽然"小而美"的思路没成为 LLM 主流（推理速度反而慢），但"参数共享"和"Embedding 分解"思想至今仍在影响模型设计。',
+    miniViz: 'albert-opt'
+  },
+  {
+    id: 't5',
+    name: 'T5',
+    fullname: 'Text-To-Text Transfer Transformer',
+    icon: 'fa-solid fa-arrows-left-right',
+    color: 't',
+    meta: 'Google · 2019 · Encoder-Decoder',
+    desc: 'Encoder-Decoder 架构，提出 Text-to-Text 大一统思想，所有 NLP 任务统一为文本→文本。',
+    tags: ['Encoder-Decoder', 'Text-to-Text', 'C4', 'RMSNorm', '大一统'],
+    definition: 'T5 是 Google 于 2019 年提出的预训练语言模型，基于 Transformer 的 Encoder-Decoder 架构。其最大的贡献不是模型本身，而是"大一统思想"：将所有 NLP 任务（分类、翻译、摘要、问答、生成）统一表示为"输入文本→输出文本"的转换，简化了模型设计和任务处理流程。',
+    composition: [
+      '架构 · Encoder-Decoder：Encoder 双向注意力处理输入，Decoder 因果掩码+Cross-Attention 关注 Encoder 输出',
+      '架构 · Block 设计：每个 Block 包含 Multi-Head Attention + 前馈网络 + Norm 层，像乐高一样可灵活调整',
+      '改进 · RMSNorm 替代 LayerNorm：仅一个可学参数，计算均方根归一化，简化参数设置',
+      '预训练任务 · BERT-style MLM：随机遮蔽 15% token，但被遮蔽 token 作为 Decoder 目标序列（而非原位置预测）',
+      '数据集 · C4（Colossal Clean Crawled Corpus）：750GB，从 Common Crawl 清洗而来',
+      '多任务预训练：混合多个任务进行预训练，学习更通用的语言表示'
+    ],
+    code: `# T5 大一统思想 — 所有任务统一为 Text → Text
+classify: 这是一个很好的产品        →  正面
+translate English to French: Hi    →  Bonjour
+summarize: [长文本...]              →  [摘要...]
+question: context: [...] question: Q? → A
+stsb: 句子1 句子2                   →  equivalent
+
+# RMSNorm 公式 (vs LayerNorm)
+RMSNorm(x) = (x / RMS(x)) × γ
+其中 RMS(x) = sqrt(Σxᵢ²/n)
+比 LayerNorm 少了均值计算和 β 参数`,
+    insight: 'T5 像"万能翻译机"：不管是分类、翻译还是摘要，都给它一个带任务前缀的输入，它就吐出对应的输出文本。这种"格式统一"思想让一个模型能干所有事，也为后来的 Prompt 工程埋下伏笔 — 你描述清楚任务，模型就懂。这也是 InstructGPT、ChatGPT"指令微调"思想的雏形。',
+    miniViz: 't5-unify'
+  },
+  {
+    id: 'gpt',
+    name: 'GPT',
+    fullname: 'Generative Pre-Training Language Model',
+    icon: 'fa-solid fa-comment-dots',
+    color: 's',
+    meta: 'OpenAI · 2018 · Decoder-Only',
+    desc: 'Decoder-Only 架构，CLM 预训练任务。GPT-1→2→3 演进，提出 zero/few-shot，开启 LLM 时代。',
+    tags: ['Decoder-Only', 'CLM', 'Few-shot', 'Sinusoidal', 'LLM 基座'],
+    definition: 'GPT 是 OpenAI 于 2018 年发布的预训练语言模型，比 BERT 更早明确提出"预训练+微调"思想。虽然 GPT-1 性能略输 BERT，但 OpenAI 坚定选择 Decoder-Only 架构与"体量即正义"的路线，不断扩大数据和参数，GPT-3（175B）激发涌现能力与 few-shot 学习，成为 LLM 时代的开创之作。',
+    composition: [
+      '架构 · Decoder-Only：堆叠 N 层 Decoder Block，每层仅含带掩码的自注意力（无 Cross-Attention）',
+      '架构 · Pre-Norm：从 GPT-2 起改为先 LayerNorm 再 Attention，缓解深层网络的梯度消失/爆炸',
+      '架构 · 掩码自注意力：用下三角掩码遮蔽未来 token，每个 token 仅关注自身及之前位置',
+      '架构 · MLP 用一维卷积代替线性层（GPT-1/2），效果相近',
+      '位置编码 · Sinusoidal 正弦余弦（绝对位置编码，沿用 Transformer 原始设计）',
+      '预训练任务 · CLM（Causal Language Model）：基于前文预测下一个 token，训练与下游任务完全匹配'
+    ],
+    code: `# GPT 系列演进
+         Decoder  Hidden  注意力   参数量    预训练语料
+GPT-1    12 层    768     12 头    0.12B    5GB  (BooksCorpus)
+GPT-2    48 层    1600    25 头    1.5B     40GB (WebText)
+GPT-3    96 层    12288   96 头    175B     570GB (CC+WebText+Wiki)
+
+# CLM 续写示例
+input:  今天天气       →  output: 今天天气很
+input:  今天天气很     →  output: 今天天气很好
+
+# Few-shot (GPT-3 核心)
+判断"这真是一个绝佳的机会"情感:
+示例: '你表现非常好'→1; '太糟糕了'→0; '好主意'→1
+→ 模型输出: 1`,
+    insight: 'GPT 的故事是"坚持长期主义"的典范：第一代输给 BERT 没关系，继续加大模型；第二代没引起轰动没关系，继续加大数据；到第三代 175B 时，"涌现能力"出现了 — few-shot 学习让 LLM 真正可用。这告诉我们：方向对了，剩下就是把它"做大力出奇迹"。',
+    miniViz: 'gpt-evolution'
+  },
+  {
+    id: 'llama',
+    name: 'LLaMA',
+    fullname: 'Large Language Model Meta AI',
+    icon: 'fa-solid fa-mountain',
+    color: 's',
+    meta: 'Meta · 2023-2024 · Decoder-Only',
+    desc: '主流开源 LLM 基础架构，1→2→3 三代演进，引入 GQA、RoPE、128K 词表、15T 数据。',
+    tags: ['Decoder-Only', 'GQA', 'RoPE', '开源', '15T token'],
+    definition: 'LLaMA 是 Meta 开发的一系列大型预训练语言模型，从 LLaMA-1 到 LLaMA-3 展示了开源大模型的演进路径。它是当前开源 LLM 的事实标准基座，众多衍生模型（Alpaca、Vicuna、Code LLaMA 等）都建立在 LLaMA 架构之上。LLaMA 在 GPT 基础上引入多项工程优化，证明了"开源+高效"路线的可行性。',
+    composition: [
+      '架构 · Decoder-Only + Pre-Norm + RMSNorm（沿用 GPT-2 起的设计）',
+      '架构 · RoPE 旋转位置编码：将位置信息融入 Q、K 向量，支持更长上下文外推',
+      '架构 · SwiGLU 激活函数：结合 Swish 与 Gated Linear Unit，比 ReLU/GELU 表现更优',
+      '架构 · LLaMA-2 起引入 GQA（Grouped-Query Attention）：多个 Q 共享一组 K/V，平衡效率与质量',
+      '架构 · LLaMA-3 采用 128K 词表的高效 tokenizer，编码效率显著提升',
+      '训练流程：input_ids → embedding + RoPE → N×Decoder Block（Masked Self-Attn + MLP）→ 线性层映射到词表'
+    ],
+    code: `# LLaMA 三代演进
+              上下文    词表    预训练语料   关键技术
+LLaMA-1 (2023.2)  2K      32K    1T token    RoPE, SwiGLU, RMSNorm
+LLaMA-2 (2023.7)  4K      32K    2T token    + GQA, 上下文翻倍
+LLaMA-3 (2024.4)  8K      128K   15T token   + 高效 tokenizer, 7×数据
+
+# 参数版本
+LLaMA-1: 7B / 13B / 30B / 65B
+LLaMA-2: 7B / 13B / 34B / 70B  (除 34B 外开源)
+LLaMA-3: 8B / 70B  (400B 训练中)
+
+# LLaMA-1 65B 训练规模
+硬件: 2048 张 A100 80G GPU
+时长: 21 天`,
+    insight: 'LLaMA 的意义在于"开源平权"：把原本只有 OpenAI、Google 才能玩的大模型，变成社区每个人都能 fine-tune 的开源基座。从 LLaMA-1 到 LLaMA-3 的演进也清晰展示了"数据 > 架构"的规律 — 架构基本不变，但数据从 1T 飙到 15T，词表从 32K 扩到 128K，性能就跟着飙升。',
+    miniViz: 'llama-evolution'
+  },
+  {
+    id: 'glm',
+    name: 'GLM',
+    fullname: 'General Language Model',
+    icon: 'fa-solid fa-language',
+    color: 's',
+    meta: '智谱 · 2023-2024 · Decoder-Only',
+    desc: '国产开源 LLM 代表，提出 GLM 自回归空白填充任务，融合 MLM+CLM，后期回归 CLM。',
+    tags: ['Decoder-Only', 'GLM 任务', 'Post-Norm', '国产 LLM', 'GeLUs'],
+    definition: 'GLM 是由清华计算机系推出、智谱开发的通用语言模型系列，包括 ChatGLM1/2/3 及 GLM-4。它是国内最早的开源中文 LLM，也是最早提出与 GPT/LLaMA 不同独特架构的模型。GLM 通过自回归空白填充任务尝试在 NLG 与 NLU 上同时取得好表现，虽在 LLM 时代回归 CLM，但其思路具有独特借鉴意义。',
+    composition: [
+      '架构差异一 · Post Norm（vs GPT/LLaMA 的 Pre Norm）：先残差后归一化，对参数正则化更强，模型更鲁棒，但理论上对大模型不利',
+      '架构差异二 · 单个线性层做 token 预测（vs MLP）：减少输出层参数，把参数留给模型本身',
+      '架构差异三 · GeLUs 激活函数（vs ReLU）：对接近 0 的正向传播做非线性映射，保证连续性',
+      '预训练任务 · GLM（自回归空白填充）：遮蔽连续多 token，外部用 MLM 思想（双向），内部用 CLM 思想（按序重建）',
+      'ChatGLM2 起 · 回归 LLaMA 架构 + CLM 任务 + MQA 注意力机制，放弃原生 GLM 任务',
+      'ChatGLM3 起 · 支持函数调用与代码解释器，可开发 Agent 应用'
+    ],
+    code: `# GLM 自回归空白填充任务
+输入:  I <MASK> because you <MASK>
+输出:  <MASK> - love you
+       <MASK> - are a wonderful person
+
+# MLM vs CLM vs GLM
+MLM:  遮蔽单个 token，双向上下文预测 (BERT)
+CLM:  续写下一个 token，仅看上文 (GPT)
+GLM:  遮蔽连续多 token，外部双向 + 内部按序重建
+
+# GLM 家族演进
+ChatGLM-6B  (2023.3)  2K 上下文, 原生 GLM 任务
+ChatGLM2-6B (2023.6)  32K 上下文, 回归 LLaMA+CLM+MQA
+ChatGLM3-6B (2023.10) 同代架构, +函数调用+代码解释器
+GLM-4-9B    (2024.1)  8K 上下文, 1T 多语言语料, 超越 LLaMA-3-8B`,
+    insight: 'GLM 是"试图统一理解与生成"的浪漫尝试：MLM 擅长理解（NLU）但不能生成，CLM 擅长生成（NLG）但单向理解受限 — GLM 想用"空白填充"把两者缝合起来。虽然 LLM 时代证明了"CLM 体量大了理解能力自然强"，GLM 任务逐渐被放弃，但这种"敢于走不同路"的尝试，是国产 LLM 早期最宝贵的技术贡献。',
+    miniViz: 'glm-task'
+  }
+];
+
+/* ========== 当前状态 ========== */
+let currentStep = 0;
+let currentMode = 'flow';
+
+/* ========== 渲染管道导航 ========== */
+function renderPipeline() {
+  const nav = document.getElementById('pipeline-nav');
+  const line = nav.querySelector('.pipeline-line');
+  // 清空除 line 外的节点
+  Array.from(nav.children).forEach(c => { if (!c.classList.contains('pipeline-line')) c.remove(); });
+
+  STEPS.forEach((s, i) => {
+    const node = document.createElement('div');
+    node.className = 'pipeline-node';
+    if (i === currentStep) node.classList.add('active');
+    else if (i < currentStep) node.classList.add('done');
+    node.innerHTML = `
+      <div class="dot">${i}</div>
+      <div class="label">${s.label}</div>
+    `;
+    node.addEventListener('click', () => { currentStep = i; renderAll(); });
+    nav.appendChild(node);
+  });
+
+  // 进度条
+  const progress = document.getElementById('pipeline-progress');
+  const pct = STEPS.length > 1 ? (currentStep / (STEPS.length - 1)) * 100 : 0;
+  progress.style.width = pct + '%';
+}
+
+/* ========== 渲染架构图 ========== */
+function renderArch() {
+  const wrap = document.getElementById('arch-diagram');
+  wrap.innerHTML = '';
+  const step = STEPS[currentStep];
+  step.arch.forEach((b, i) => {
+    const block = document.createElement('div');
+    block.className = `arch-block role-${b.role} active`;
+    block.style.animationDelay = (i * 0.1) + 's';
+    block.innerHTML = `
+      <div class="b-label">${b.label}</div>
+      <div class="b-sub">${b.sub}</div>
+    `;
+    wrap.appendChild(block);
+    if (i < step.arch.length - 1) {
+      const arrow = document.createElement('div');
+      arrow.className = 'arch-arrow';
+      arrow.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+      wrap.appendChild(arrow);
+    }
+  });
+}
+
+/* ========== 渲染数据可视化 ========== */
+function renderViz() {
+  const area = document.getElementById('viz-area');
+  area.innerHTML = '';
+  const step = STEPS[currentStep];
+  const vizType = step.viz;
+
+  if (vizType === 'tokens') {
+    area.innerHTML = `
+      <div class="viz-caption">// 示例文本 → Token 化（WordPiece / BPE）</div>
+      <div class="token-row">
+        <span class="token-box special" style="animation-delay:.05s">[CLS]</span>
+        <span class="token-box" style="animation-delay:.1s">I</span>
+        <span class="token-box" style="animation-delay:.15s">love</span>
+        <span class="token-box" style="animation-delay:.2s">you</span>
+        <span class="token-box" style="animation-delay:.25s">because</span>
+        <span class="token-box" style="animation-delay:.3s">you</span>
+        <span class="token-box" style="animation-delay:.35s">are</span>
+        <span class="token-box" style="animation-delay:.4s">wonderful</span>
+        <span class="token-box special" style="animation-delay:.45s">[SEP]</span>
+      </div>
+      <div class="viz-caption" style="margin-top:12px">// Token → input_ids（词典序号）</div>
+      <div class="token-row">
+        <span class="token-box id" style="animation-delay:.5s">101</span>
+        <span class="token-box id" style="animation-delay:.55s">1045</span>
+        <span class="token-box id" style="animation-delay:.6s">2293</span>
+        <span class="token-box id" style="animation-delay:.65s">2017</span>
+        <span class="token-box id" style="animation-delay:.7s">2138</span>
+        <span class="token-box id" style="animation-delay:.75s">2017</span>
+        <span class="token-box id" style="animation-delay:.8s">2024</span>
+        <span class="token-box id" style="animation-delay:.85s">7936</span>
+        <span class="token-box id" style="animation-delay:.9s">102</span>
+      </div>
+    `;
+  } else if (vizType === 'vector') {
+    const vals = [0.42, -0.18, 0.71, 0.05, -0.55, 0.88, 0.31, -0.67, 0.49, 0.22, -0.39, 0.63];
+    let bars = '';
+    vals.forEach((v, i) => {
+      const h = Math.abs(v) * 100 + 20;
+      bars += `<div class="v-bar" style="height:${h}px;animation-delay:${i * 0.05}s;background:${v >= 0 ? 'linear-gradient(180deg,var(--primary),rgba(0,229,160,0.3))' : 'linear-gradient(180deg,var(--secondary),rgba(245,158,11,0.3))'}">
+        <span class="v-val">${v.toFixed(2)}</span>
+      </div>`;
+    });
+    area.innerHTML = `
+      <div class="viz-caption">// input_id 1045 → Embedding 查表 → H 维向量</div>
+      <div class="vector-bars">${bars}</div>
+      <div class="viz-caption" style="margin-top:10px">↑ H=768 维（仅展示前 12 维），正值绿色 / 负值橙色</div>
+    `;
+  } else if (vizType === 'compare-arch') {
+    area.innerHTML = `
+      <div class="viz-caption">// 三大架构对比</div>
+      <div class="compare-cards">
+        <div class="compare-card c-primary">
+          <div class="c-title">Encoder-Only</div>
+          <div class="c-text">BERT / RoBERTa / ALBERT<br>双向注意力<br>擅长 NLU<br>输出 Label</div>
+        </div>
+        <div class="compare-card c-tertiary">
+          <div class="c-title">Enc-Dec</div>
+          <div class="c-text">T5<br>编码器+解码器<br>Cross-Attn 交互<br>统一 Seq2Seq</div>
+        </div>
+        <div class="compare-card c-secondary">
+          <div class="c-title">Decoder-Only</div>
+          <div class="c-text">GPT / LLaMA / GLM<br>因果掩码<br>擅长 NLG<br>LLM 基座</div>
+        </div>
+      </div>
+      <div class="viz-caption" style="margin-top:14px">// 注意力可见性</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div>
+          <div style="text-align:center;font-size:11px;color:var(--primary);margin-bottom:6px">全可见</div>
+          ${renderMiniMask('full')}
+        </div>
+        <div>
+          <div style="text-align:center;font-size:11px;color:var(--tertiary);margin-bottom:6px">编码双向/解码因果</div>
+          ${renderMiniMask('mixed')}
+        </div>
+        <div>
+          <div style="text-align:center;font-size:11px;color:var(--secondary);margin-bottom:6px">下三角因果</div>
+          ${renderMiniMask('causal')}
+        </div>
+      </div>
+    `;
+  } else if (vizType === 'attention-mask') {
+    const n = 5;
+    let html = `<div class="viz-caption">// 注意力掩码对比（n=5 序列）</div>`;
+    const types = [
+      { name: 'BERT 双向', color: 'primary', mask: 'full' },
+      { name: 'GPT 因果', color: 'secondary', mask: 'causal' },
+      { name: 'T5 编码器', color: 'tertiary', mask: 'full' }
+    ];
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px">';
+    types.forEach(t => {
+      html += `<div><div style="text-align:center;font-size:11px;color:var(--${t.color});margin-bottom:8px;font-weight:700">${t.name}</div>`;
+      html += '<div class="attn-grid" style="grid-template-columns:repeat(' + n + ',auto)">';
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          let visible, score;
+          if (t.mask === 'full') { visible = true; score = (Math.random() * 0.8 + 0.2).toFixed(2); }
+          else { visible = j <= i; score = visible ? (Math.random() * 0.8 + 0.2).toFixed(2) : '0.00'; }
+          const alpha = visible ? parseFloat(score) : 0;
+          const bg = visible
+            ? `rgba(0,229,160,${0.15 + alpha * 0.7})`
+            : 'rgba(239,68,68,0.15)';
+          const border = visible ? 'rgba(0,229,160,0.4)' : 'rgba(239,68,68,0.3)';
+          html += `<div class="attn-cell" style="background:${bg};border:1px solid ${border};animation:token-in 0.4s ease forwards;animation-delay:${(i*n+j)*0.02}s;opacity:0">
+            ${visible ? score : '✗'}
+            <span class="tip">row ${i} → col ${j}: ${visible ? score : '掩码'}</span>
+          </div>`;
+        }
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    area.innerHTML = html;
+  } else if (vizType === 'pretrain-tasks') {
+    area.innerHTML = `
+      <div class="viz-caption">// MLM (BERT) — 完形填空</div>
+      <div class="token-row">
+        <span class="token-box" style="animation-delay:.05s">I</span>
+        <span class="token-box masked" style="animation-delay:.1s">[MASK]</span>
+        <span class="token-box" style="animation-delay:.15s">you</span>
+        <span class="token-box" style="animation-delay:.2s">because</span>
+        <span class="token-box" style="animation-delay:.25s">you</span>
+        <span class="token-box" style="animation-delay:.3s">are</span>
+        <span class="token-box masked" style="animation-delay:.35s">[MASK]</span>
+      </div>
+      <div class="viz-caption" style="margin-top:6px">↓ 预测</div>
+      <div class="token-row">
+        <span class="token-box" style="animation-delay:.4s;background:rgba(0,229,160,0.25)">love</span>
+        <span class="token-box" style="animation-delay:.45s;background:rgba(0,229,160,0.25)">wonderful</span>
+      </div>
+
+      <div class="viz-caption" style="margin-top:18px">// CLM (GPT) — 续写下文</div>
+      <div class="token-row">
+        <span class="token-box" style="animation-delay:.5s;background:rgba(245,158,11,0.15);border-color:var(--secondary);color:var(--secondary)">今天</span>
+        <span class="token-box" style="animation-delay:.55s;background:rgba(245,158,11,0.15);border-color:var(--secondary);color:var(--secondary)">天气</span>
+        <span class="token-box" style="animation-delay:.6s">→</span>
+        <span class="token-box" style="animation-delay:.65s;background:rgba(245,158,11,0.25);border-color:var(--secondary);color:var(--secondary)">很</span>
+      </div>
+
+      <div class="viz-caption" style="margin-top:18px">// GLM — 空白填充（连续多 token）</div>
+      <div class="token-row">
+        <span class="token-box" style="animation-delay:.7s">I</span>
+        <span class="token-box masked" style="animation-delay:.75s">[MASK]</span>
+        <span class="token-box" style="animation-delay:.8s">because</span>
+        <span class="token-box" style="animation-delay:.85s">you</span>
+        <span class="token-box masked" style="animation-delay:.9s">[MASK]</span>
+      </div>
+      <div class="viz-caption" style="margin-top:6px">↓ 预测（连续 token 按序重建）</div>
+      <div class="token-row">
+        <span class="token-box" style="animation-delay:.95s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">love</span>
+        <span class="token-box" style="animation-delay:1s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">you</span>
+        <span class="token-box" style="animation-delay:1.05s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">are</span>
+        <span class="token-box" style="animation-delay:1.1s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">a</span>
+        <span class="token-box" style="animation-delay:1.15s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">wonderful</span>
+        <span class="token-box" style="animation-delay:1.2s;background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">person</span>
+      </div>
+    `;
+  } else if (vizType === 'finetune-modes') {
+    area.innerHTML = `
+      <div class="viz-caption">// 三种下游任务适配范式</div>
+      <div class="flow-steps">
+        <div class="flow-step" style="animation-delay:0s">
+          <div class="step-icon"><i class="fa-solid fa-book"></i></div>
+          <div class="step-text">BERT: <small>预训练 + 微调 — 替换 prediction_heads 适配分类/标注/生成</small></div>
+        </div>
+        <div class="flow-step" style="animation-delay:.15s">
+          <div class="step-icon" style="background:rgba(56,189,248,0.15);color:var(--tertiary)"><i class="fa-solid fa-arrows-left-right"></i></div>
+          <div class="step-text">T5: <small>Text-to-Text — 加任务前缀，统一为"输入文本→输出文本"</small></div>
+        </div>
+        <div class="flow-step" style="animation-delay:.3s">
+          <div class="step-icon" style="background:rgba(245,158,11,0.15);color:var(--secondary)"><i class="fa-solid fa-lightbulb"></i></div>
+          <div class="step-text">GPT: <small>Zero/Few-shot — 不微调，在 prompt 中给 3-5 个示例（In-context Learning）</small></div>
+        </div>
+        <div class="flow-step" style="animation-delay:.45s">
+          <div class="step-icon" style="background:rgba(245,158,11,0.15);color:var(--secondary)"><i class="fa-solid fa-comments"></i></div>
+          <div class="step-text">ChatGPT: <small>预训练 → 指令微调 → RLHF 三阶段训练</small></div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/* 渲染小型掩码网格（用于架构对比） */
+function renderMiniMask(type) {
+  const n = 4;
+  let html = '<div style="display:grid;grid-template-columns:repeat(' + n + ',1fr);gap:2px;max-width:90px;margin:0 auto">';
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      let visible;
+      if (type === 'full') visible = true;
+      else if (type === 'causal') visible = j <= i;
+      else if (type === 'mixed') visible = (i + j) % 3 !== 0; // 简化示意
+      const bg = visible ? 'rgba(0,229,160,0.45)' : 'rgba(107,122,148,0.15)';
+      html += `<div style="aspect-ratio:1;border-radius:2px;background:${bg}"></div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ========== 渲染步骤说明 ========== */
+function renderStepDetail() {
+  const wrap = document.getElementById('step-detail');
+  const s = STEPS[currentStep];
+  wrap.innerHTML = `
+    <div class="step-header">
+      <div class="step-num">${s.id}</div>
+      <div class="step-titles">
+        <h2>${s.title}</h2>
+        <div class="step-tag">${s.tag}</div>
+      </div>
+    </div>
+    <div class="step-body">${s.body}</div>
+  `;
+}
+
+/* ========== 渲染所有 ========== */
+function renderAll() {
+  renderPipeline();
+  renderArch();
+  renderViz();
+  renderStepDetail();
+  document.getElementById('prev-btn').disabled = currentStep === 0;
+  document.getElementById('next-btn').disabled = currentStep === STEPS.length - 1;
+}
+
+/* ========== 模式二：渲染组件卡片 ========== */
+function renderModelGrid() {
+  const grid = document.getElementById('model-grid');
+  grid.innerHTML = '';
+  MODELS.forEach(m => {
+    const card = document.createElement('div');
+    card.className = `model-card c-${m.color === 'p' ? 'primary' : m.color === 's' ? 'secondary' : 'tertiary'}`;
+    const tags = m.tags.map(t => `<span class="model-tag ${m.color}">${t}</span>`).join('');
+    card.innerHTML = `
+      <div class="model-icon ${m.color}"><i class="${m.icon}"></i></div>
+      <h3>${m.name}</h3>
+      <div class="model-meta">${m.meta}</div>
+      <div class="model-desc">${m.desc}</div>
+      <div class="model-tags">${tags}</div>
+    `;
+    card.addEventListener('click', () => openModal(m));
+    grid.appendChild(card);
+  });
+}
+
+/* ========== 弹窗 ========== */
+function openModal(m) {
+  const overlay = document.getElementById('modal-overlay');
+  const content = document.getElementById('modal-content');
+  const compList = m.composition.map(c => `<li>${c}</li>`).join('');
+  const iconClass = m.color;
+  const secClass = m.color === 'p' ? '' : m.color === 's' ? 's' : 't';
+
+  content.innerHTML = `
+    <div class="modal-header">
+      <div class="model-icon ${iconClass}"><i class="${m.icon}"></i></div>
+      <div>
+        <h2>${m.name}</h2>
+        <div class="modal-meta">${m.fullname}</div>
+        <div class="modal-meta" style="margin-top:4px">${m.meta}</div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3><i class="fa-solid fa-info-circle"></i> 定义</h3>
+      <p>${m.definition}</p>
+    </div>
+
+    <div class="modal-section ${secClass}">
+      <h3><i class="fa-solid fa-puzzle-piece"></i> 组成与实现</h3>
+      <ul>${compList}</ul>
+    </div>
+
+    <div class="modal-section ${secClass}">
+      <h3><i class="fa-solid fa-chart-bar"></i> 迷你可视化</h3>
+      <div class="mini-viz" id="mini-viz-${m.id}">${renderMiniViz(m.miniViz)}</div>
+    </div>
+
+    <div class="modal-section">
+      <h3><i class="fa-solid fa-code"></i> 代码 / 公式</h3>
+      <pre class="code-block">${m.code}</pre>
+    </div>
+
+    <div class="modal-section ${secClass}">
+      <h3><i class="fa-solid fa-lightbulb"></i> 通俗理解</h3>
+      <p>${m.insight}</p>
+    </div>
+  `;
+  overlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function renderMiniViz(type) {
+  if (type === 'mlm') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:10px">// BERT MLM 15% 遮蔽策略</div>
+      <div class="token-row" style="margin-bottom:10px">
+        <span class="token-box">I</span>
+        <span class="token-box masked">[MASK] ×80%</span>
+        <span class="token-box" style="background:rgba(239,68,68,0.15);border-color:#ef4444;color:#ef4444">random ×10%</span>
+        <span class="token-box" style="background:rgba(56,189,248,0.15);border-color:var(--tertiary);color:var(--tertiary)">keep ×10%</span>
+        <span class="token-box">you</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;color:var(--muted);text-align:center">
+        <div>80% 概率<br>遮蔽为 [MASK]</div>
+        <div>10% 概率<br>随机替换</div>
+        <div>10% 概率<br>保持不变</div>
+      </div>
+    `;
+  }
+  if (type === 'compare-bert-roberta') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// BERT vs RoBERTa 关键差异</div>
+      <table class="compare-table">
+        <tr><th>维度</th><th>BERT</th><th>RoBERTa</th></tr>
+        <tr><td>语料</td><td>13GB</td><td>160GB (10×)</td></tr>
+        <tr><td>Batch</td><td>256</td><td>8K (32×)</td></tr>
+        <tr><td>NSP</td><td>有</td><td>去掉</td></tr>
+        <tr><td>Mask</td><td>静态</td><td>动态</td></tr>
+        <tr><td>词表</td><td>30K</td><td>50K</td></tr>
+      </table>
+    `;
+  }
+  if (type === 'albert-opt') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// ALBERT 三大优化</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div class="compare-card c-primary">
+          <div class="c-title">Embedding 分解</div>
+          <div class="c-text">V×H → V×E+E×H<br>30M → 4M</div>
+        </div>
+        <div class="compare-card c-primary">
+          <div class="c-title">跨层共享</div>
+          <div class="c-text">24 层共享 1 份参数<br>334M → 59M</div>
+        </div>
+        <div class="compare-card c-primary">
+          <div class="c-title">SOP 任务</div>
+          <div class="c-text">负例 = 正例句序颠倒<br>比 NSP 更难</div>
+        </div>
+      </div>
+    `;
+  }
+  if (type === 't5-unify') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// T5 大一统 — 所有任务 Text → Text</div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-icon" style="background:rgba(56,189,248,0.15);color:var(--tertiary)"><i class="fa-solid fa-tag"></i></div>
+          <div class="step-text"><code>classify: 这是个好产品</code> <small>→ 正面</small></div>
+        </div>
+        <div class="flow-step">
+          <div class="step-icon" style="background:rgba(56,189,248,0.15);color:var(--tertiary)"><i class="fa-solid fa-language"></i></div>
+          <div class="step-text"><code>translate English to French: Hi</code> <small>→ Bonjour</small></div>
+        </div>
+        <div class="flow-step">
+          <div class="step-icon" style="background:rgba(56,189,248,0.15);color:var(--tertiary)"><i class="fa-solid fa-file-lines"></i></div>
+          <div class="step-text"><code>summarize: [长文]</code> <small>→ [摘要]</small></div>
+        </div>
+      </div>
+    `;
+  }
+  if (type === 'gpt-evolution') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// GPT 1→2→3 体量爆炸</div>
+      <table class="compare-table">
+        <tr><th>版本</th><th>参数</th><th>语料</th><th>突破</th></tr>
+        <tr><td>GPT-1</td><td>0.12B</td><td>5GB</td><td>首个 Decoder-Only</td></tr>
+        <tr><td>GPT-2</td><td>1.5B</td><td>40GB</td><td>Zero-shot</td></tr>
+        <tr><td>GPT-3</td><td>175B</td><td>570GB</td><td>Few-shot + 涌现</td></tr>
+      </table>
+    `;
+  }
+  if (type === 'llama-evolution') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// LLaMA 1→2→3 三代演进</div>
+      <table class="compare-table">
+        <tr><th>版本</th><th>上下文</th><th>词表</th><th>语料</th><th>新增</th></tr>
+        <tr><td>LLaMA-1</td><td>2K</td><td>32K</td><td>1T</td><td>RoPE+SwiGLU</td></tr>
+        <tr><td>LLaMA-2</td><td>4K</td><td>32K</td><td>2T</td><td>GQA</td></tr>
+        <tr><td>LLaMA-3</td><td>8K</td><td>128K</td><td>15T</td><td>高效 tokenizer</td></tr>
+      </table>
+    `;
+  }
+  if (type === 'glm-task') {
+    return `
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">// GLM 自回归空白填充</div>
+      <div class="token-row" style="margin-bottom:8px">
+        <span class="token-box">I</span>
+        <span class="token-box masked">[MASK]</span>
+        <span class="token-box">because</span>
+        <span class="token-box">you</span>
+        <span class="token-box masked">[MASK]</span>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--muted);margin:6px 0">↓ 外部用 MLM 思想（双向）+ 内部用 CLM 思想（按序）</div>
+      <div class="token-row">
+        <span class="token-box" style="background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">love</span>
+        <span class="token-box" style="background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">you</span>
+        <span class="token-box" style="background:rgba(56,189,248,0.25);border-color:var(--tertiary);color:var(--tertiary)">are a wonderful person</span>
+      </div>
+    `;
+  }
+  return '';
+}
+
+/* ========== 事件绑定 ========== */
+// 模式切换
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const mode = btn.dataset.mode;
+    currentMode = mode;
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('mode-' + mode).classList.add('active');
+  });
+});
+
+// 上一步/下一步
+document.getElementById('prev-btn').addEventListener('click', () => {
+  if (currentStep > 0) { currentStep--; renderAll(); }
+});
+document.getElementById('next-btn').addEventListener('click', () => {
+  if (currentStep < STEPS.length - 1) { currentStep++; renderAll(); }
+});
+
+// 键盘左右
+document.addEventListener('keydown', (e) => {
+  if (currentMode !== 'flow') return;
+  if (document.getElementById('modal-overlay').classList.contains('show')) {
+    if (e.key === 'Escape') closeModal();
+    return;
+  }
+  if (e.key === 'ArrowLeft' && currentStep > 0) { currentStep--; renderAll(); }
+  if (e.key === 'ArrowRight' && currentStep < STEPS.length - 1) { currentStep++; renderAll(); }
+});
+
+// 弹窗关闭
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-overlay') closeModal();
+});
+
+/* ========== 粒子网络动画背景 ========== */
+(function () {
+  const canvas = document.getElementById('particle-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let mouse = { x: null, y: null };
+  const PARTICLE_COUNT = 70;
+  const MAX_DIST = 140;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // 颜色数组（主色系）
+  const colors = [
+    { r: 0, g: 229, b: 160 },     // primary
+    { r: 56, g: 189, b: 248 },    // tertiary
+    { r: 245, g: 158, b: 11 }     // secondary
+  ];
+
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: Math.random() * 1.8 + 0.6,
+        c: c
+      });
+    }
+  }
+  initParticles();
+  window.addEventListener('resize', initParticles);
+
+  window.addEventListener('mousemove', (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+  window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 更新粒子位置
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+    });
+
+    // 画连线
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MAX_DIST) {
+          const alpha = (1 - dist / MAX_DIST) * 0.18;
+          const c = particles[i].c;
+          ctx.strokeStyle = `rgba(${c.r},${c.g},${c.b},${alpha})`;
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 鼠标连线
+    if (mouse.x !== null) {
+      particles.forEach(p => {
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 160) {
+          const alpha = (1 - dist / 160) * 0.35;
+          ctx.strokeStyle = `rgba(${p.c.r},${p.c.g},${p.c.b},${alpha})`;
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(mouse.x, mouse.y);
+          ctx.stroke();
+        }
+      });
+    }
+
+    // 画粒子
+    particles.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.3, p.r), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.c.r},${p.c.g},${p.c.b},0.7)`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ========== 初始化 ========== */
+renderAll();
+renderModelGrid();
+</script>
+
+</body>
+</html>
