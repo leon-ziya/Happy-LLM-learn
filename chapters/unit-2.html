@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer 架构流程可视化</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;700;900&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b14;--fg:#e8ecf4;--muted:#6b7a94;--accent:#00e5a0;--accent2:#ff6b35;
+  --card:#0f1724;--border:#1a2540;--enc:#00e5a0;--dec:#ff6b35;--emb:#38bdf8;
+  --glow-enc:0 0 20px rgba(0,229,160,.35);--glow-dec:0 0 20px rgba(255,107,53,.35);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--fg);overflow-x:hidden;min-height:100vh}
+#bgCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.app{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:20px 24px 60px}
+header{text-align:center;padding:32px 0 16px}
+header h1{font-size:clamp(28px,4vw,42px);font-weight:900;letter-spacing:-.02em;background:linear-gradient(135deg,var(--enc),var(--emb));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header p{color:var(--muted);margin-top:8px;font-size:15px}
+/* 模式切换 */
+.mode-tabs{display:flex;justify-content:center;gap:8px;margin:20px 0 28px}
+.mode-btn{padding:10px 28px;border-radius:999px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;transition:all .3s;font-family:inherit}
+.mode-btn:hover{border-color:var(--accent);color:var(--fg)}
+.mode-btn.active{background:var(--accent);color:#070b14;border-color:var(--accent)}
+/* 流程演示 */
+#flowSection,#compSection{display:none}
+#flowSection.active,#compSection.active{display:block}
+.pipeline-nav{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;margin-bottom:28px;padding:0 10px}
+.p-node{display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:all .3s;position:relative;padding:6px 4px}
+.p-dot{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--border);background:var(--card);transition:all .4s;position:relative;z-index:2}
+.p-node.active .p-dot{border-color:var(--accent);background:var(--accent);box-shadow:0 0 16px rgba(0,229,160,.5);transform:scale(1.25)}
+.p-node.done .p-dot{border-color:var(--accent);background:rgba(0,229,160,.25)}
+.p-label{font-size:11px;color:var(--muted);margin-top:6px;white-space:nowrap;transition:color .3s;font-weight:700}
+.p-node.active .p-label{color:var(--accent)}
+.p-conn{width:24px;height:2.5px;background:var(--border);transition:background .4s;flex-shrink:0;margin-bottom:16px}
+.p-conn.done{background:var(--accent)}
+/* 可视化主区域 */
+.viz-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;min-height:420px}
+@media(max-width:860px){.viz-wrap{grid-template-columns:1fr;}}
+.viz-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;position:relative;overflow:hidden}
+.viz-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--enc),var(--emb));opacity:.6}
+.viz-title{font-size:13px;color:var(--accent);font-weight:700;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+/* 架构图 */
+.arch-diagram{display:flex;flex-direction:column;gap:8px;align-items:center;padding:10px 0}
+.arch-block{width:100%;max-width:260px;padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:rgba(15,23,36,.7);text-align:center;font-size:13px;font-weight:700;transition:all .5s;position:relative}
+.arch-block .arch-icon{margin-right:6px;font-size:14px}
+.arch-block.enc{border-color:rgba(0,229,160,.25)}
+.arch-block.dec{border-color:rgba(255,107,53,.25)}
+.arch-block.emb{border-color:rgba(56,189,248,.25)}
+.arch-block.highlight{transform:scale(1.04);z-index:2}
+.arch-block.highlight.enc{border-color:var(--enc);box-shadow:var(--glow-enc);background:rgba(0,229,160,.08)}
+.arch-block.highlight.dec{border-color:var(--dec);box-shadow:var(--glow-dec);background:rgba(255,107,53,.08)}
+.arch-block.highlight.emb{border-color:var(--emb);box-shadow:0 0 20px rgba(56,189,248,.3);background:rgba(56,189,248,.08)}
+.arch-arrow{color:var(--muted);font-size:18px;line-height:1;margin:2px 0}
+.arch-arrow.active{color:var(--accent)}
+.cross-line{position:relative;width:100%;max-width:260px;height:32px;margin:4px 0}
+.cross-line svg{width:100%;height:100%}
+/* 数据可视化 */
+.data-viz{min-height:300px;display:flex;flex-direction:column;gap:14px}
+.token-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.token-box{padding:10px 18px;border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;text-align:center;transition:all .4s;animation:tokenIn .5s ease both}
+@keyframes tokenIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.token-box.chinese{background:rgba(0,229,160,.12);border:1.5px solid rgba(0,229,160,.35);color:var(--enc)}
+.token-box.id{background:rgba(56,189,248,.1);border:1.5px solid rgba(56,189,248,.3);color:var(--emb)}
+.token-box.english{background:rgba(255,107,53,.12);border:1.5px solid rgba(255,107,53,.35);color:var(--dec)}
+.token-box.masked{background:rgba(107,122,148,.1);border:1.5px solid rgba(107,122,148,.25);color:var(--muted);position:relative}
+.token-box.masked::after{content:'MASK';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;letter-spacing:.05em;opacity:.7}
+.arrow-down{text-align:center;color:var(--accent);font-size:20px;margin:4px 0;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+/* 注意力矩阵 */
+.attn-matrix{display:inline-grid;gap:2px;padding:8px;background:rgba(0,0,0,.3);border-radius:10px;border:1px solid var(--border)}
+.attn-cell{width:36px;height:36px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'JetBrains Mono',monospace;transition:all .3s}
+.attn-label{font-size:11px;color:var(--muted);text-align:center;padding:4px 0;font-weight:700}
+.attn-row-label,.attn-col-label{font-size:10px;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'JetBrains Mono',monospace}
+/* 向量条 */
+.vec-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.vec-label{font-size:11px;color:var(--muted);width:36px;text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.vec-bars{display:flex;gap:2px;flex:1}
+.vec-bar{height:22px;border-radius:3px;transition:all .4s;animation:barGrow .6s ease both}
+@keyframes barGrow{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+/* 步骤说明 */
+.step-explain{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 28px;margin-bottom:20px}
+.step-explain h3{font-size:18px;font-weight:900;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.step-explain h3 .step-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#070b14;font-size:14px;font-weight:900;flex-shrink:0}
+.step-explain p{color:var(--muted);line-height:1.8;font-size:14px}
+.step-explain .highlight-text{color:var(--accent);font-weight:700}
+.step-explain .highlight-dec{color:var(--dec);font-weight:700}
+.step-explain .highlight-emb{color:var(--emb);font-weight:700}
+/* 导航按钮 */
+.step-nav{display:flex;justify-content:center;gap:16px;margin-bottom:28px}
+.step-btn{padding:12px 32px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);color:var(--fg);font-size:14px;font-weight:700;cursor:pointer;transition:all .3s;font-family:inherit;display:flex;align-items:center;gap:8px}
+.step-btn:hover{border-color:var(--accent);background:rgba(0,229,160,.08)}
+.step-btn:disabled{opacity:.3;cursor:not-allowed;border-color:var(--border);background:var(--card)}
+.step-btn.primary{background:var(--accent);color:#070b14;border-color:var(--accent)}
+.step-btn.primary:hover{box-shadow:0 0 24px rgba(0,229,160,.3);transform:translateY(-1px)}
+/* 组件详解 */
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.comp-card{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:22px;cursor:pointer;transition:all .35s;position:relative;overflow:hidden}
+.comp-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.comp-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity .3s}
+.comp-card:hover::after{opacity:1}
+.comp-card.enc-card::after{background:linear-gradient(90deg,var(--enc),transparent)}
+.comp-card.dec-card::after{background:linear-gradient(90deg,var(--dec),transparent)}
+.comp-card.emb-card::after{background:linear-gradient(90deg,var(--emb),transparent)}
+.comp-card.shared-card::after{background:linear-gradient(90deg,var(--muted),transparent)}
+.comp-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px}
+.enc-card .comp-icon{background:rgba(0,229,160,.12);color:var(--enc)}
+.dec-card .comp-icon{background:rgba(255,107,53,.12);color:var(--dec)}
+.emb-card .comp-icon{background:rgba(56,189,248,.12);color:var(--emb)}
+.shared-card .comp-icon{background:rgba(107,122,148,.12);color:var(--muted)}
+.comp-card h4{font-size:16px;font-weight:900;margin-bottom:6px}
+.comp-card .comp-brief{font-size:13px;color:var(--muted);line-height:1.6}
+/* 组件详情弹窗 */
+.comp-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(7,11,20,.85);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
+.comp-modal-overlay.open{display:flex}
+.comp-modal{background:var(--card);border:1.5px solid var(--border);border-radius:20px;max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:32px;position:relative;animation:modalIn .35s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.comp-modal-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.comp-modal-close:hover{border-color:var(--accent);color:var(--fg)}
+.comp-modal h2{font-size:24px;font-weight:900;margin-bottom:6px}
+.comp-modal .comp-tag{display:inline-block;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:16px}
+.comp-modal .comp-tag.enc{background:rgba(0,229,160,.12);color:var(--enc)}
+.comp-modal .comp-tag.dec{background:rgba(255,107,53,.12);color:var(--dec)}
+.comp-modal .comp-tag.emb{background:rgba(56,189,248,.12);color:var(--emb)}
+.comp-modal .comp-tag.shared{background:rgba(107,122,148,.12);color:var(--muted)}
+.comp-modal .detail-section{margin-bottom:20px}
+.comp-modal .detail-section h3{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.comp-modal .detail-section p{font-size:14px;color:var(--muted);line-height:1.9}
+.comp-modal .detail-section code{background:rgba(0,229,160,.08);color:var(--enc);padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.comp-modal .mini-viz{background:rgba(0,0,0,.25);border-radius:12px;padding:16px;margin:12px 0;border:1px solid var(--border)}
+/* 残差连接图 */
+.residual-diagram{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px}
+.res-block{padding:8px 20px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;border:1.5px solid}
+.res-block.ln{border-color:rgba(56,189,248,.3);background:rgba(56,189,248,.06);color:var(--emb)}
+.res-block.attn{border-color:rgba(0,229,160,.3);background:rgba(0,229,160,.06);color:var(--enc)}
+.res-block.mlp{border-color:rgba(255,107,53,.3);background:rgba(255,107,53,.06);color:var(--dec)}
+.res-plus{font-size:16px;font-weight:900;color:var(--accent)}
+.res-bypass{font-size:11px;color:var(--muted);font-style:italic}
+/* 掩码矩阵 */
+.mask-demo{display:inline-grid;gap:2px;padding:6px;background:rgba(0,0,0,.3);border-radius:8px}
+.mask-cell{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700}
+.mask-cell.visible{background:rgba(0,229,160,.15);color:var(--enc);border:1px solid rgba(0,229,160,.2)}
+.mask-cell.hidden{background:rgba(255,107,53,.08);color:var(--dec);border:1px solid rgba(255,107,53,.15)}
+/* 流程总结图 */
+.flow-summary{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0}
+.flow-step-box{padding:8px 24px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;background:var(--card);border:1.5px solid var(--border);max-width:300px;width:100%;animation:fadeSlideIn .4s ease both}
+.flow-step-box:nth-child(odd){animation-delay:calc(var(--i,0)*.08s)}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.flow-arrow-sm{color:var(--accent);font-size:14px}
+/* 滚动条 */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+@media(prefers-reduced-motion:reduce){*{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="app">
+  <header>
+    <h1>Transformer 架构流程可视化</h1>
+    <p>以"我喜欢苹果 → I like apples"翻译为例，交互式理解 Transformer 每一步</p>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-btn active" data-mode="flow"><i class="fas fa-play-circle"></i>&ensp;流程演示</button>
+    <button class="mode-btn" data-mode="comp"><i class="fas fa-cubes"></i>&ensp;组件详解</button>
+  </div>
+
+  <!-- ====== 流程演示 ====== -->
+  <section id="flowSection" class="active">
+    <div class="pipeline-nav" id="pipelineNav"></div>
+    <div class="viz-wrap">
+      <div class="viz-box">
+        <div class="viz-title"><i class="fas fa-sitemap"></i>&ensp;架构全景</div>
+        <div class="arch-diagram" id="archDiagram"></div>
+      </div>
+      <div class="viz-box">
+        <div class="viz-title"><i class="fas fa-database"></i>&ensp;数据变换</div>
+        <div class="data-viz" id="dataViz"></div>
+      </div>
+    </div>
+    <div class="step-explain" id="stepExplain"></div>
+    <div class="step-nav">
+      <button class="step-btn" id="prevBtn" disabled><i class="fas fa-chevron-left"></i> 上一步</button>
+      <button class="step-btn primary" id="nextBtn">下一步 <i class="fas fa-chevron-right"></i></button>
+    </div>
+  </section>
+
+  <!-- ====== 组件详解 ====== -->
+  <section id="compSection">
+    <div class="comp-grid" id="compGrid"></div>
+  </section>
+</div>
+
+<!-- 组件详情弹窗 -->
+<div class="comp-modal-overlay" id="compModal">
+  <div class="comp-modal" id="compModalContent"></div>
+</div>
+
+<script>
+/* ========== 背景粒子 ========== */
+(function(){
+  const c=document.getElementById('bgCanvas'),ctx=c.getContext('2d');
+  let w,h,particles=[];
+  function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;initParticles()}
+  function initParticles(){
+    particles=[];
+    const count=Math.min(Math.floor(w*h/12000),120);
+    for(let i=0;i<count;i++) particles.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.5,a:Math.random()*.3+.1})
+  }
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    /* 渐变背景层 */
+    const g=ctx.createRadialGradient(w*.3,h*.3,0,w*.5,h*.5,w*.7);
+    g.addColorStop(0,'rgba(0,229,160,0.03)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+    const g2=ctx.createRadialGradient(w*.7,h*.7,0,w*.5,h*.5,w*.6);
+    g2.addColorStop(0,'rgba(56,189,248,0.02)');g2.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g2;ctx.fillRect(0,0,w,h);
+    /* 粒子 */
+    for(const p of particles){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,229,160,${p.a})`;ctx.fill();
+    }
+    /* 连线 */
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<120){
+          ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle=`rgba(0,229,160,${.06*(1-dist/120)})`;
+          ctx.lineWidth=.6;ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',resize);
+  resize();draw();
+})();
+
+/* ========== 数据定义 ========== */
+const STEPS=[
+  {id:'input',label:'原始输入',type:'emb'},
+  {id:'tokenize',label:'Tokenizer',type:'emb'},
+  {id:'embed',label:'Embedding',type:'emb'},
+  {id:'enc_sa',label:'Self-Attention',type:'enc'},
+  {id:'enc_mlp',label:'Encoder加工',type:'enc'},
+  {id:'enc_out',label:'Encoder输出',type:'enc'},
+  {id:'dec_mask',label:'Mask Attention',type:'dec'},
+  {id:'dec_cross',label:'Cross Attention',type:'dec'},
+  {id:'dec_out',label:'生成输出',type:'dec'}
+];
+
+/* 注意力矩阵数据（模拟） */
+const SELF_ATTN=[
+  [.7,.2,.1],
+  [.25,.5,.25],
+  [.15,.25,.6]
+];
+const MASK_ATTN=[
+  [1,0,0],
+  [.6,.4,0],
+  [.3,.4,.3]
+];
+const CROSS_ATTN=[
+  [.05,.15,.8],
+  [.7,.2,.1],
+  [.1,.6,.3]
+];
+
+/* ========== 模式切换 ========== */
+const modeBtns=document.querySelectorAll('.mode-btn');
+const flowSection=document.getElementById('flowSection');
+const compSection=document.getElementById('compSection');
+modeBtns.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    modeBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const mode=btn.dataset.mode;
+    flowSection.classList.toggle('active',mode==='flow');
+    compSection.classList.toggle('active',mode==='comp');
+  });
+});
+
+/* ========== 流程演示 ========== */
+let currentStep=0;
+
+/* 构建管道导航 */
+function buildPipelineNav(){
+  const nav=document.getElementById('pipelineNav');
+  nav.innerHTML='';
+  STEPS.forEach((s,i)=>{
+    const node=document.createElement('div');
+    node.className='p-node'+(i===currentStep?' active':i<currentStep?' done':'');
+    node.innerHTML=`<div class="p-dot"></div><div class="p-label">${s.label}</div>`;
+    node.addEventListener('click',()=>{currentStep=i;renderStep()});
+    nav.appendChild(node);
+    if(i<STEPS.length-1){
+      const conn=document.createElement('div');
+      conn.className='p-conn'+(i<currentStep?' done':'');
+      nav.appendChild(conn);
+    }
+  });
+}
+
+/* 构建架构图 */
+function buildArchDiagram(){
+  const d=document.getElementById('archDiagram');
+  const highlightStep=currentStep;
+  const isEnc=[3,4,5].includes(highlightStep);
+  const isDec=[6,7,8].includes(highlightStep);
+  const isEmb=[0,1,2].includes(highlightStep);
+  d.innerHTML=`
+    <div class="arch-block emb ${isEmb&&highlightStep<=2?'highlight':''}"><i class="fas fa-font arch-icon"></i>输入文本</div>
+    <div class="arch-arrow ${highlightStep>=1?'active':''}"><i class="fas fa-arrow-down"></i></div>
+    <div class="arch-block emb ${highlightStep===1?'highlight':''}"><i class="fas fa-scissors arch-icon"></i>Tokenizer</div>
+    <div class="arch-arrow ${highlightStep>=2?'active':''}"><i class="fas fa-arrow-down"></i></div>
+    <div class="arch-block emb ${highlightStep===2?'highlight':''}"><i class="fas fa-table arch-icon"></i>Embedding + 位置编码</div>
+    <div class="arch-arrow ${highlightStep>=3?'active':''}"><i class="fas fa-arrow-down"></i></div>
+    <div class="arch-block enc ${isEnc?'highlight':''}"><i class="fas fa-layer-group arch-icon"></i>Encoder × N</div>
+    <div class="arch-arrow ${highlightStep>=6?'active':''}"><i class="fas fa-arrow-down"></i></div>
+    <div class="cross-line"><svg viewBox="0 0 260 32"><line x1="130" y1="0" x2="130" y2="32" stroke="${highlightStep===7?'#ff6b35':'#1a2540'}" stroke-width="2" stroke-dasharray="${highlightStep===7?'none':'4,4'}"/><line x1="60" y1="16" x2="200" y2="16" stroke="${highlightStep===7?'#ff6b35':'#1a2540'}" stroke-width="1.5" stroke-dasharray="${highlightStep===7?'none':'4,4'}" opacity=".5"/></svg></div>
+    <div class="arch-block dec ${isDec?'highlight':''}"><i class="fas fa-layer-group arch-icon"></i>Decoder × N</div>
+    <div class="arch-arrow ${highlightStep>=8?'active':''}"><i class="fas fa-arrow-down"></i></div>
+    <div class="arch-block ${highlightStep===8?'highlight dec':''}"><i class="fas fa-language arch-icon"></i>输出文本</div>
+  `;
+}
+
+/* 数据可视化 */
+function buildDataViz(){
+  const v=document.getElementById('dataViz');
+  const s=currentStep;
+  let html='';
+  if(s===0){
+    html=`<div style="text-align:center;padding:30px 0">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:16px">原始中文输入</div>
+      <div class="token-row">
+        <div class="token-box chinese" style="animation-delay:.1s">我</div>
+        <div class="token-box chinese" style="animation-delay:.2s">喜欢</div>
+        <div class="token-box chinese" style="animation-delay:.3s">苹果</div>
+      </div>
+      <div style="margin-top:20px;font-size:13px;color:var(--muted)">模型无法直接处理自然语言文字</div>
+    </div>`;
+  } else if(s===1){
+    html=`<div style="text-align:center;padding:20px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Tokenizer 将文字转为编号</div>
+      <div class="token-row">
+        <div class="token-box chinese" style="animation-delay:.1s">我</div>
+        <div class="token-box chinese" style="animation-delay:.2s">喜欢</div>
+        <div class="token-box chinese" style="animation-delay:.3s">苹果</div>
+      </div>
+      <div class="arrow-down"><i class="fas fa-arrow-down"></i></div>
+      <div class="token-row">
+        <div class="token-box id" style="animation-delay:.5s">11</div>
+        <div class="token-box id" style="animation-delay:.6s">25</div>
+        <div class="token-box id" style="animation-delay:.7s">39</div>
+      </div>
+    </div>`;
+  } else if(s===2){
+    html=`<div style="padding:16px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">Embedding 将编号查表为向量 + 位置编码</div>
+      ${buildVecRows(['我','喜欢','苹果'],['#00e5a0','#38bdf8','#ff6b35'])}
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)">每个向量 = 词嵌入 + 位置编码</div>
+    </div>`;
+  } else if(s===3){
+    html=`<div style="padding:12px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">Self-Attention：每个词看其他所有词</div>
+      <div style="display:flex;justify-content:center">
+        ${buildAttnMatrix(['我','喜欢','苹果'],SELF_ATTN,'enc')}
+      </div>
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)">Q=K=V 来自同一输入 → 捕捉句内关系</div>
+    </div>`;
+  } else if(s===4){
+    html=`<div style="padding:12px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;text-align:center">残差连接 + LayerNorm + MLP</div>
+      <div class="residual-diagram">
+        <div class="res-block ln">LayerNorm</div>
+        <div style="font-size:12px;color:var(--muted)"><i class="fas fa-arrow-down"></i></div>
+        <div class="res-block attn">Self-Attention</div>
+        <div class="res-plus">+ 残差连接</div>
+        <div class="res-block ln">LayerNorm</div>
+        <div style="font-size:12px;color:var(--muted)"><i class="fas fa-arrow-down"></i></div>
+        <div class="res-block mlp">MLP (前馈网络)</div>
+        <div class="res-plus">+ 残差连接</div>
+        <div class="res-bypass">↑ 原始输入直接跳接到输出</div>
+      </div>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">多个 Encoder Layer 堆叠 → 反复提炼语义</div>
+    </div>`;
+  } else if(s===5){
+    html=`<div style="text-align:center;padding:20px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Encoder 输出：融合上下文的语义表示</div>
+      ${buildVecRows(['enc_我','enc_喜','enc_苹'],['#00e5a0','#38bdf8','#ff6b35'])}
+      <div style="margin-top:16px;font-size:12px;color:var(--accent)">每个向量已包含整句话的上下文信息</div>
+    </div>`;
+  } else if(s===6){
+    html=`<div style="padding:12px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;text-align:center">Masked Self-Attention：只看已生成的前面的词</div>
+      <div style="display:flex;justify-content:center">
+        ${buildMaskMatrix(['&lt;BOS&gt;','I','like'])}
+      </div>
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)">上三角被遮蔽 → 防止偷看未来信息</div>
+    </div>`;
+  } else if(s===7){
+    html=`<div style="padding:12px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;text-align:center">Cross Attention：Decoder 去"查"Encoder 输出</div>
+      <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:16px;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;color:var(--dec);text-align:center;margin-bottom:4px;font-weight:700">Q ← Decoder</div>
+          ${buildAttnMatrixCol(['&lt;BOS&gt;','I','like'],CROSS_ATTN,'dec',['我','喜欢','苹果'])}
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">
+        <span style="color:var(--dec)">Q</span>=Decoder 当前状态 &ensp;
+        <span style="color:var(--enc)">K,V</span>=Encoder 输出
+      </div>
+    </div>`;
+  } else if(s===8){
+    html=`<div style="text-align:center;padding:20px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">经过 MLP → 线性层 → Softmax → 生成下一个词</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+        <div class="token-box english" style="animation-delay:.1s">&lt;BOS&gt;</div>
+        <div class="token-box english" style="animation-delay:.2s">I</div>
+        <div class="token-box english" style="animation-delay:.3s">like</div>
+        <div style="font-size:20px;color:var(--accent);animation:pulse 1s ease infinite"><i class="fas fa-plus"></i></div>
+        <div class="token-box english" style="animation-delay:.5s;border-color:var(--accent);background:rgba(0,229,160,.12);color:var(--accent)">apples</div>
+      </div>
+      <div style="margin-top:20px;font-size:13px;color:var(--accent)">重复此过程直到生成结束符 &lt;EOS&gt;</div>
+    </div>`;
+  }
+  v.innerHTML=html;
+}
+
+/* 向量行 */
+function buildVecRows(labels,colors){
+  let html='';
+  labels.forEach((lb,i)=>{
+    html+=`<div class="vec-row"><div class="vec-label">${lb}</div><div class="vec-bars">`;
+    for(let j=0;j<8;j++){
+      const w=Math.random()*60+20;
+      const ci=Math.floor(j/3)%colors.length;
+      html+=`<div class="vec-bar" style="width:${w}%;background:${colors[ci]};opacity:${.4+Math.random()*.5};animation-delay:${(i*8+j)*.04}s"></div>`;
+    }
+    html+=`</div></div>`;
+  });
+  return html;
+}
+
+/* 注意力矩阵（Self-Attention） */
+function buildAttnMatrix(labels,matrix,type){
+  const accentColor=type==='enc'?'0,229,160':'255,107,53';
+  let html='<div>';
+  /* 列标签 */
+  html+='<div style="display:flex;gap:2px;margin-left:40px;margin-bottom:2px">';
+  labels.forEach(l=>{html+=`<div class="attn-col-label" style="width:36px">${l}</div>`});
+  html+='</div>';
+  matrix.forEach((row,i)=>{
+    html+=`<div style="display:flex;align-items:center;gap:2px">`;
+    html+=`<div class="attn-row-label" style="width:38px">${labels[i]}</div>`;
+    row.forEach((val,j)=>{
+      const alpha=Math.max(val,.05);
+      html+=`<div class="attn-cell" style="background:rgba(${accentColor},${alpha*.6});color:rgba(255,255,255,${alpha>.3?.9:.4})" title="${labels[i]}→${labels[j]}: ${val}">${val.toFixed(1)}</div>`;
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+/* 注意力矩阵（Cross-Attention 带双标签） */
+function buildAttnMatrixCol(qLabels,matrix,type,kLabels){
+  const accentColor=type==='enc'?'0,229,160':'255,107,53';
+  let html='<div>';
+  html+='<div style="display:flex;gap:2px;margin-left:56px;margin-bottom:2px">';
+  kLabels.forEach(l=>{html+=`<div class="attn-col-label" style="width:36px;font-size:9px">${l}</div>`});
+  html+='</div>';
+  matrix.forEach((row,i)=>{
+    html+=`<div style="display:flex;align-items:center;gap:2px">`;
+    html+=`<div class="attn-row-label" style="width:54px;font-size:9px">${qLabels[i]}</div>`;
+    row.forEach((val,j)=>{
+      const alpha=Math.max(val,.05);
+      html+=`<div class="attn-cell" style="width:36px;height:36px;background:rgba(${accentColor},${alpha*.6});color:rgba(255,255,255,${alpha>.3?.9:.4});font-size:10px" title="${qLabels[i]}→${kLabels[j]}: ${val}">${val.toFixed(1)}</div>`;
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+/* 掩码矩阵 */
+function buildMaskMatrix(labels){
+  let html='<div>';
+  html+='<div style="display:flex;gap:2px;margin-left:52px;margin-bottom:2px">';
+  labels.forEach(l=>{html+=`<div class="attn-col-label" style="width:32px;font-size:9px">${l}</div>`});
+  html+='</div>';
+  for(let i=0;i<labels.length;i++){
+    html+=`<div style="display:flex;align-items:center;gap:2px">`;
+    html+=`<div class="attn-row-label" style="width:50px;font-size:9px">${labels[i]}</div>`;
+    for(let j=0;j<labels.length;j++){
+      const visible=j<=i;
+      html+=`<div class="mask-cell ${visible?'visible':'hidden'}">${visible?'✓':'✗'}</div>`;
+    }
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+/* 步骤说明 */
+function buildStepExplain(){
+  const e=document.getElementById('stepExplain');
+  const explanations=[
+    {title:'原始输入',text:`翻译任务的源语言输入是 <span class="highlight-text">"我 喜欢 苹果"</span>。这是自然语言文本，模型无法直接处理，需要先转化为数值形式。`},
+    {title:'Tokenizer 分词',text:`Tokenizer 将连续文本切分成 <span class="highlight-emb">token</span> 并映射为固定编号。例如：<span class="highlight-text">我→11</span>，<span class="highlight-text">喜欢→25</span>，<span class="highlight-text">苹果→39</span>。Embedding 层和后续网络只能处理数字。`},
+    {title:'Embedding + 位置编码',text:`Embedding 层将每个 token ID 查表映射为 <span class="highlight-emb">稠密向量</span>（如 e1, e2, e3）。同时加入 <span class="highlight-emb">位置编码</span>，因为 Self-Attention 本身没有位置概念，需要额外告诉模型每个词的位置信息。`},
+    {title:'Self-Attention 自注意力',text:`在 Encoder 中，<span class="highlight-text">Q、K、V 都来自同一个输入</span>。每个 token 去"看"句子中所有其他 token，计算彼此的相关性（注意力分数）。例如"苹果"可能会更关注"喜欢"而不是"我"，从而理解这是"喜欢苹果"的语义关系。`},
+    {title:'Encoder Layer 完整加工',text:`Self-Attention 之后依次经过：<span class="highlight-emb">残差连接</span>（输入直接加到输出上，防止深层退化）→ <span class="highlight-emb">LayerNorm</span>（归一化，稳定训练）→ <span class="highlight-dec">MLP</span>（前馈网络，非线性特征加工）→ 残差连接。N 个这样的 Encoder Layer 堆叠，反复提炼语义。`},
+    {title:'Encoder 输出',text:`经过 N 层 Encoder 后，输入句子被编码为一组 <span class="highlight-text">融合了上下文信息的语义向量</span> enc_out。每个位置（我、喜欢、苹果）的表示已不再是孤立的词向量，而是理解了整句话之后的语义表示。这些向量将传给 Decoder 的 Cross-Attention 层。`},
+    {title:'Masked Self-Attention',text:`Decoder 的第一个注意力层使用 <span class="highlight-dec">掩码</span>，保证每个 token 只能看到自己及前面的 token，不能偷看未来。例如生成 "like" 时，只能看 <code>&lt;BOS&gt;</code> 和 "I"，不能看 "apples"。这保证了自回归生成的正确性。`},
+    {title:'Cross Attention 交叉注意力',text:`这是 Encoder 和 Decoder 交互的关键！<span class="highlight-dec">Q 来自 Decoder 当前状态</span>（"我现在要生成什么"），<span class="highlight-text">K、V 来自 Encoder 输出</span>（"输入句子每个位置提供了什么信息"）。例如，当 Decoder 准备生成下一个英文词时，它拿自己的状态去 Encoder 输出里查询最相关的部分——如果注意力集中在"苹果"，就更可能生成 "apples"。`},
+    {title:'MLP + 输出生成',text:`Cross-Attention 的输出再经过 MLP 加工，然后通过线性层映射到词表大小，Softmax 得到概率分布，选择概率最高的 token 作为输出。例如这里生成了 <span class="highlight-text">"apples"</span>。Decoder 重复上述过程（Masked SA → Cross Attn → MLP → 输出），一个词一个词生成，直到遇到 <code>&lt;EOS&gt;</code> 结束。`},
+  ];
+  const exp=explanations[currentStep];
+  e.innerHTML=`<h3><span class="step-num">${currentStep}</span>${exp.title}</h3><p>${exp.text}</p>`;
+}
+
+/* 渲染当前步骤 */
+function renderStep(){
+  buildPipelineNav();
+  buildArchDiagram();
+  buildDataViz();
+  buildStepExplain();
+  document.getElementById('prevBtn').disabled=currentStep===0;
+  document.getElementById('nextBtn').disabled=currentStep===STEPS.length-1;
+  document.getElementById('nextBtn').textContent=currentStep===STEPS.length-1?'已完成':'下一步';
+  if(currentStep<STEPS.length-1){
+    document.getElementById('nextBtn').innerHTML='下一步 <i class="fas fa-chevron-right"></i>';
+  }
+}
+
+document.getElementById('prevBtn').addEventListener('click',()=>{if(currentStep>0){currentStep--;renderStep()}});
+document.getElementById('nextBtn').addEventListener('click',()=>{if(currentStep<STEPS.length-1){currentStep++;renderStep()}});
+
+/* 键盘导航 */
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'&&currentStep<STEPS.length-1){currentStep++;renderStep()}
+  if(e.key==='ArrowLeft'&&currentStep>0){currentStep--;renderStep()}
+});
+
+renderStep();
+
+/* ========== 组件详解 ========== */
+const COMPONENTS=[
+  {
+    id:'encoder',name:'Encoder Layer',type:'enc',icon:'fa-layer-group',
+    brief:'Encoder 的单层积木块，由 Self-Attention + MLP + LayerNorm + 残差连接组成，N 层堆叠反复提炼输入语义。',
+    detail:{
+      def:'Encoder Layer 是 Encoder 里的"单层积木块"。一个 Encoder 由 N 个 Encoder Layer 反复堆叠而成。',
+      compose:'一个 Encoder Layer 主要包含：1) LayerNorm → 2) Self-Attention → 3) 残差连接 → 4) LayerNorm → 5) MLP → 6) 残差连接',
+      code:'<code>norm_x = LayerNorm(x)</code><br><code>h = x + SelfAttention(norm_x, norm_x, norm_x)</code><br><code>out = h + MLP(LayerNorm(h))</code>',
+      analogy:'你可以把一个 Encoder Layer 理解成一个"加工车间"：先把输入整理一下（LayerNorm），再看看句子内部哪些词彼此相关（Self-Attention），再做一次非线性特征加工（MLP），最后输出给下一层继续加工。多个 Encoder Layer 叠起来，就像多道工序反复提炼输入语义。'
+    }
+  },
+  {
+    id:'layernorm',name:'LayerNorm',type:'shared',icon:'fa-balance-scale',
+    brief:'层归一化，对每个样本在最后一个维度上统计均值和方差，把数据调整到更稳定的分布，让训练更稳定。',
+    detail:{
+      def:'LayerNorm 的作用是：对每个样本在最后一个维度上统计均值和方差，然后把数据调整到更稳定的分布。',
+      compose:'计算过程：<code>mean = x.mean(-1, keepdim=True)</code><br><code>std = x.std(-1, keepdim=True)</code><br>然后做归一化变换：output = (x - mean) / (std + eps) * γ + β',
+      code:'在 Encoder Layer 中，LayerNorm 放在 Attention 前和 MLP 前（Pre-Norm 结构）。在 Decoder Layer 中，有三个 LayerNorm，分别在 Mask Attention 前、Cross Attention 前和 MLP 前。',
+      analogy:'你可以把 LayerNorm 想成"进入工序前先校准一下量纲"。就像一批零件每次进入新车间之前，先统一规格，这样后面的机器更好处理。'
+    }
+  },
+  {
+    id:'selfattn',name:'Self-Attention',type:'enc',icon:'fa-arrows-alt',
+    brief:'自注意力：一个序列里的每个 token 在理解自己时，可以去看同一个序列里的其他 token，决定"我该关注谁更多"。',
+    detail:{
+      def:'Self-Attention 的意思是：一个序列里的每个 token，在理解自己时，可以去看同一个序列里的其他 token，并决定"我该关注谁更多"。',
+      compose:'在 Encoder 中，Q、K、V 都来自同一个输入 norm_x，所以叫 Self-Attention。计算公式：<br><code>Attention(Q,K,V) = softmax(QK^T / √d_k) · V</code>',
+      code:'代码实现中：self.attention.forward(norm_x, norm_x, norm_x)，三个参数都是 norm_x，说明 Q=K=V 来自同一输入。',
+      analogy:'一句话内部开会，每个词都问："为了理解我自己，我应该重点参考谁？"比如"它"这个词，模型可能会更多关注前面的"猫"，而不是"桌子"。'
+    }
+  },
+  {
+    id:'mlp',name:'MLP (前馈网络)',type:'shared',icon:'fa-project-diagram',
+    brief:'对每个位置的表示再做一次非线性变换和特征加工。Attention 擅长"找关系"，MLP 擅长"做特征加工"。',
+    detail:{
+      def:'MLP（Multi-Layer Perceptron），即 Transformer 里的前馈神经网络（Feed Forward Network）。接在 Attention 后面，对每个位置做非线性变换。',
+      compose:'Transformer 的 MLP 由两个线性层中间加激活函数组成：<code>output = W2(ReLU(W1(x)))</code>，还加入了 Dropout 防止过拟合。',
+      code:'在 Encoder 和 Decoder 中，MLP 都是作为 Attention 后面的第二个核心子模块出现的。第一层线性变换扩展维度，激活函数引入非线性，第二层线性变换恢复维度。',
+      analogy:'Attention 像"收集资料"，MLP 像"整理资料并做总结"。Attention 负责看词和词之间谁重要，MLP 把已经聚合好的信息进一步提炼。'
+    }
+  },
+  {
+    id:'decoder',name:'Decoder',type:'dec',icon:'fa-magic',
+    brief:'负责根据输入语义，一步一步生成输出。由两个注意力层和一个前馈神经网络组成。',
+    detail:{
+      def:'Decoder 是 Transformer 中负责生成输出的一部分。和 Encoder 不同，它由两个注意力层和一个前馈神经网络组成。',
+      compose:'一个 Decoder Layer 包括：1) LayerNorm → 2) Masked Self-Attention → 3) LayerNorm → 4) Multi-Head Attention（和 Encoder 输出交互）→ 5) LayerNorm → 6) MLP',
+      code:'核心逻辑：先做 Masked Self-Attention，再做一个多头注意力层（使用 norm_x 作为 query，enc_out 作为 key 和 value），最后再过 MLP。',
+      analogy:'如果说 Encoder 是"读题的人"，那 Decoder 就是"答题的人"。它一边看自己已经写出来的内容，一边参考 Encoder 理解后的输入语义，逐步生成答案。'
+    }
+  },
+  {
+    id:'maskedattn',name:'Masked Self-Attention',type:'dec',icon:'fa-eye-slash',
+    brief:'带遮挡规则的自注意力，每个 token 只能看到自己及前面的 token，不能偷看后面的，防止"作弊"。',
+    detail:{
+      def:'Masked Self-Attention 是一种带遮挡规则的 Self-Attention。它要求每个 token 只能看到自己以及自己前面的 token，不能偷看后面的 token。',
+      compose:'实现方式：创建一个上三角矩阵作为注意力掩码，上三角位置为 -inf，其余为 0。将掩码加到注意力分数上再做 Softmax，-inf 位置就会变成 0，从而实现遮蔽。',
+      code:'掩码矩阵是上三角矩阵：<code>mask = torch.triu(torch.full(..., float("-inf")), diagonal=1)</code><br>计算时：<code>scores = scores + mask</code>，然后 Softmax。',
+      analogy:'这就像做"完形填空"：写当前空格时，你只能看前面已经写出来的内容，不能先看后面的标准答案。否则训练时就"作弊"了。'
+    }
+  },
+  {
+    id:'multihead',name:'Multi-Head Attention',type:'shared',icon:'fa-clone',
+    brief:'把 Attention 分成多个"头"同时去看信息，不同头可以关注不同类型的关系，最后拼接合并。',
+    detail:{
+      def:'Multi-Head Attention 是把 Attention 分成多个"头"同时去看信息，不同头可以关注不同类型的关系。',
+      compose:'将 Q、K、V 拆成多头：从 (B, T, C) 变成 (B, T, n_head, C//n_head)，再转成 (B, n_head, T, C//n_head) 进行计算。最后将多个头的结果拼接起来，通过线性层输出。',
+      code:'每个头使用不同的参数矩阵，从而通过反向传播学习了不同的注意力模式。多头计算可以通过矩阵运算并行实现。',
+      analogy:'一个头像一个"观察员"，多头注意力就是"多个观察员同时从不同角度看同一句话"。有的头关注主谓关系，有的头关注指代关系，有的头关注位置关系。'
+    }
+  },
+  {
+    id:'crossattn',name:'Cross Attention',type:'dec',icon:'fa-exchange-alt',
+    brief:'Q 来自 Decoder，K/V 来自 Encoder。Decoder 用自己当前状态去查询 Encoder 对输入的编码结果。',
+    detail:{
+      def:'在 Decoder 的第二个注意力层中，Query 来自 Decoder 当前状态，Key 和 Value 来自 Encoder 的输出。这就是 Cross Attention。',
+      compose:'代码：<code>h = x + self.attention.forward(norm_x, enc_out, enc_out)</code>。这里 norm_x（Decoder 当前状态）是 query，enc_out（Encoder 输出）是 key 和 value。',
+      code:'假设翻译"我 喜欢 苹果"：Encoder 输出了 3 个语义向量 enc_out[我]、enc_out[喜欢]、enc_out[苹果]。当 Decoder 已生成 "I like"，准备生成下一个词时，它拿当前状态去查 Encoder 输出，如果注意力集中在"苹果"上，就更可能生成 "apples"。',
+      analogy:'Decoder 像在问："我现在准备写下一个英文词，我应该重点参考中文输入里的哪一部分？"Encoder 输出就像一本"已经整理好的中文语义笔记"，Decoder 拿着自己的 query 去这本笔记里查最相关的信息。'
+    }
+  },
+  {
+    id:'embedding',name:'Embedding + 位置编码',type:'emb',icon:'fa-th',
+    brief:'Embedding 将 token ID 查表为稠密向量；位置编码注入位置信息，弥补 Attention 无位置感的缺陷。',
+    detail:{
+      def:'Embedding 层是一个"存储固定大小词典的嵌入向量查找表"，本质是从 token id 到向量的映射表。位置编码通过正余弦函数对 token 的位置进行编码，再加到词向量上。',
+      compose:'流程：文本 → tokenizer → token ID → Embedding（查表为向量）→ + 位置编码。Embedding 内部是 (vocab_size, embedding_dim) 的可训练权重矩阵。位置编码公式：PE(pos,2i) = sin(pos/10000^(2i/d))，PE(pos,2i+1) = cos(pos/10000^(2i/d))',
+      code:'self.tok_embeddings = nn.Embedding(vocab_size, dim)<br>pe[:, 0::2] = torch.sin(position * div_term)<br>pe[:, 1::2] = torch.cos(position * div_term)<br>x = x + pe[:, :x.size(1)]',
+      analogy:'Tokenizer 是"编号员"，Embedding 是"词典查表器"。比如编号 1023 对应"苹果"，Embedding 就把 1023 查成一个向量。位置编码则是给每个词贴上"座位号"，让模型知道谁在前面谁在后面。'
+    }
+  },
+  {
+    id:'fullflow',name:'完整流程总结',type:'shared',icon:'fa-route',
+    brief:'文本 → Tokenizer → Embedding → Encoder → Decoder → 生成输出，完整 Transformer 翻译流程。',
+    detail:{
+      def:'完整的 Transformer 翻译流程，以"我喜欢苹果 → I like apples"为例：',
+      compose:'1. 原始输入：中文"我 喜欢 苹果"<br>2. Tokenizer：我→11, 喜欢→25, 苹果→39<br>3. Embedding + 位置编码：ID → 稠密向量 + 位置信息<br>4. Encoder：N 层 (LayerNorm → Self-Attention → 残差 → LayerNorm → MLP → 残差)<br>5. Encoder 输出 enc_out：融合上下文的语义表示<br>6. Decoder Masked Self-Attention：只看已生成的 token<br>7. Decoder Cross Attention：Q=Decoder状态, K/V=enc_out<br>8. MLP + 线性层 + Softmax → 生成下一个 token<br>9. 重复步骤 6-8 直到生成 &lt;EOS&gt;',
+      code:'整体代码结构：<br>tok_emb = Embedding(idx)<br>pos_emb = PositionalEncoding(tok_emb)<br>enc_out = Encoder(pos_emb)<br>dec_out = Decoder(pos_emb, enc_out)<br>logits = Linear(dec_out)<br>loss = CrossEntropy(logits, targets)',
+      analogy:'整个流程就像一个翻译团队：Tokenizer 是"分词员"，Embedding 是"查表员"，Encoder 是"理解员"（读懂中文），Decoder 是"翻译员"（一个词一个词写出英文），Cross Attention 是翻译员时不时回头参考理解员的笔记。'
+    }
+  }
+];
+
+/* 构建组件卡片 */
+function buildCompGrid(){
+  const grid=document.getElementById('compGrid');
+  grid.innerHTML='';
+  COMPONENTS.forEach((comp,i)=>{
+    const card=document.createElement('div');
+    card.className=`comp-card ${comp.type}-card`;
+    card.innerHTML=`
+      <div class="comp-icon"><i class="fas ${comp.icon}"></i></div>
+      <h4>${comp.name}</h4>
+      <div class="comp-brief">${comp.brief}</div>
+    `;
+    card.addEventListener('click',()=>openCompModal(i));
+    grid.appendChild(card);
+  });
+}
+
+/* 组件弹窗 */
+function openCompModal(idx){
+  const comp=COMPONENTS[idx];
+  const modal=document.getElementById('compModal');
+  const content=document.getElementById('compModalContent');
+  const typeLabel={enc:'Encoder 组件',dec:'Decoder 组件',emb:'输入处理',shared:'共享组件'};
+  
+  let miniViz='';
+  if(comp.id==='selfattn'){
+    miniViz=`<div class="mini-viz"><div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Self-Attention 注意力矩阵示例</div><div style="display:flex;justify-content:center">${buildAttnMatrix(['我','喜欢','苹果'],SELF_ATTN,'enc')}</div></div>`;
+  } else if(comp.id==='maskedattn'){
+    miniViz=`<div class="mini-viz"><div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Masked Self-Attention 掩码示意</div><div style="display:flex;justify-content:center">${buildMaskMatrix(['&lt;BOS&gt;','I','like'])}</div></div>`;
+  } else if(comp.id==='crossattn'){
+    miniViz=`<div class="mini-viz"><div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Cross Attention：Decoder 查询 Encoder</div><div style="display:flex;justify-content:center;flex-wrap:wrap;gap:12px"><div><div style="font-size:10px;color:var(--dec);text-align:center;margin-bottom:4px">Q ← Decoder</div>${buildAttnMatrixCol(['&lt;BOS&gt;','I','like'],CROSS_ATTN,'dec',['我','喜欢','苹果'])}</div></div></div>`;
+  } else if(comp.id==='encoder'||comp.id==='decoder'){
+    miniViz=`<div class="mini-viz"><div class="residual-diagram">
+      <div class="res-block ln">LayerNorm</div><div style="font-size:12px;color:var(--muted)"><i class="fas fa-arrow-down"></i></div>
+      <div class="res-block attn">${comp.id==='encoder'?'Self-Attention':'Masked Self-Attention'}</div>
+      <div class="res-plus">+ 残差连接</div>
+      <div class="res-block ln">LayerNorm</div><div style="font-size:12px;color:var(--muted)"><i class="fas fa-arrow-down"></i></div>
+      ${comp.id==='decoder'?'<div class="res-block attn">Cross Attention (Q=Decoder, KV=Encoder)</div><div class="res-plus">+ 残差连接</div><div class="res-block ln">LayerNorm</div><div style="font-size:12px;color:var(--muted)"><i class="fas fa-arrow-down"></i></div>':''}
+      <div class="res-block mlp">MLP (前馈网络)</div>
+      <div class="res-plus">+ 残差连接</div>
+    </div></div>`;
+  } else if(comp.id==='embedding'){
+    miniViz=`<div class="mini-viz"><div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:10px">Embedding + 位置编码 流程</div>
+    <div class="flow-summary">
+      <div class="flow-step-box" style="--i:0">文本 "我 喜欢 苹果"</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:1">Tokenizer → [11, 25, 39]</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:2">Embedding 查表 → [e1, e2, e3]</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:3">+ 位置编码 (sin/cos)</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:4">送入 Encoder / Decoder</div>
+    </div></div>`;
+  } else if(comp.id==='fullflow'){
+    miniViz=`<div class="mini-viz"><div class="flow-summary">
+      <div class="flow-step-box" style="--i:0;border-color:rgba(56,189,248,.3)">文本 → Tokenizer</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:1;border-color:rgba(56,189,248,.3)">Embedding + 位置编码</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:2;border-color:rgba(0,229,160,.3)">Encoder × N (Self-Attn + MLP)</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:3;border-color:rgba(255,107,53,.3)">Decoder × N (Mask-Attn + Cross-Attn + MLP)</div><div class="flow-arrow-sm"><i class="fas fa-arrow-down"></i></div>
+      <div class="flow-step-box" style="--i:4;border-color:rgba(0,229,160,.3)">线性层 + Softmax → 下一个 token</div>
+    </div></div>`;
+  }
+
+  content.innerHTML=`
+    <button class="comp-modal-close" aria-label="关闭"><i class="fas fa-times"></i></button>
+    <h2>${comp.name}</h2>
+    <span class="comp-tag ${comp.type}">${typeLabel[comp.type]}</span>
+    <div class="detail-section"><h3><i class="fas fa-info-circle"></i> 定义</h3><p>${comp.detail.def}</p></div>
+    <div class="detail-section"><h3><i class="fas fa-puzzle-piece"></i> 组成与实现</h3><p>${comp.detail.compose}</p></div>
+    ${miniViz}
+    <div class="detail-section"><h3><i class="fas fa-code"></i> 代码逻辑</h3><p>${comp.detail.code}</p></div>
+    <div class="detail-section"><h3><i class="fas fa-lightbulb"></i> 通俗理解</h3><p>${comp.detail.analogy}</p></div>
+  `;
+  modal.classList.add('open');
+  
+  content.querySelector('.comp-modal-close').addEventListener('click',()=>modal.classList.remove('open'));
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open')});
+}
+
+/* 初始化组件网格 */
+buildCompGrid();
+
+/* ESC 关闭弹窗 */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')document.getElementById('compModal').classList.remove('open');
+});
+</script>
+</body>
+</html>
