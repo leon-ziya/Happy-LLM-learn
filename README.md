@@ -98,8 +98,14 @@
     </tr>
     <tr>
       <td align="center"><b>第三章</b></td>
-      <td><b>🚀 敬请期待</b></td>
-      <td colspan="2" align="center"><i>🚧 规划中…</i></td>
+      <td><b>🚀 预训练语言模型</b></td>
+      <td>
+        • BERT/RoBERTa/ALBERT/T5/GPT/LLaMA/GLM 七大经典模型<br>
+        • 三大架构分支：Encoder-Only、Decoder-Only、Encoder-Decoder<br>
+        • 两类预训练任务：MLM（掩码语言模型）、CLM（因果语言模型）<br>
+        • 演进时间线：2018-2024 六年发展史
+      </td>
+      <td align="center">🟢 已发布</td>
     </tr>
   </tbody>
 </table>
@@ -164,6 +170,7 @@ serve .
 ```
 chapters/unit-1.html   ← 第一章：NLP 基础概念
 chapters/unit-2.html   ← 第二章：Transformer 架构
+chapters/unit-3.html   ← 第三章：预训练语言模型
 ```
 
 > 💡 **Tip**：每个章节文件内嵌了全部 CSS 与 JS，无外部依赖（仅引用 Google Fonts 与 Font Awesome CDN），断网也可离线浏览主体内容。
